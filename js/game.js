@@ -273,15 +273,15 @@
   // 길가 풍경(장식, 충돌 없음) — 명물 얼음조각 + 소품
   function spawnScenery() {
     const side = Math.random() < 0.5 ? -1 : 1;
-    if (Math.random() < 0.22) {
-      // 이번 스테이지의 전세계 명물(크게, 멀리)
+    if (Math.random() < 0.26) {
+      // 이번 스테이지의 전세계 명물(길 옆에 보이도록)
       const lm = stageLandmark();
-      scenery.push({ type: "landmark", key: lm.key, lane: side * (1.75 + Math.random() * 0.7),
+      scenery.push({ type: "landmark", key: lm.key, lane: side * (1.18 + Math.random() * 0.35),
         p: 0, vp: 0.10, flip: side < 0 });
     } else {
       const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
       const type = types[(Math.random() * types.length) | 0];
-      scenery.push({ type: type, lane: side * (1.25 + Math.random() * 0.7),
+      scenery.push({ type: type, lane: side * (1.12 + Math.random() * 0.4),
         p: 0, vp: 0.10, flip: side < 0 });
     }
   }
@@ -1418,5 +1418,11 @@
       { type: "hole", lane: 0, p: 0.93, vp: 0, len: 0.28, w: 1.0, shape: makeJagged(), done: false, cleared: false },
     ];
     stored = [{ symbol: "Fe", name: "철", color: "#9aa7b0" }, { symbol: "Cu", name: "구리", color: "#d98f5a" }, { symbol: "Au", name: "금", color: "#e8c349" }];
+    scenery = [
+      { type: "landmark", key: stageLandmark().key, lane: -1.3, p: 0.5, vp: 0, flip: false },
+      { type: "landmark", key: stageLandmark().key, lane: 1.32, p: 0.66, vp: 0, flip: true },
+      { type: "igloo", lane: -1.3, p: 0.34, vp: 0, flip: false },
+      { type: "penguin", lane: 1.28, p: 0.4, vp: 0, flip: true },
+    ];
   }
 })();
