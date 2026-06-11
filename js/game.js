@@ -610,7 +610,7 @@
       hp: hp, maxHp: hp, r: 42, hit: 0,
       sway: 0, shootTimer: 2.2, bounce: 0,
     };
-    showToast("❄ 빙하의 군주 등장! 집중 사격!", true);
+    showToast("❄ 북극곰 우두머리 등장! 집중 사격!", true);
     shake = Math.min(20, shake + 14);
     screenFlash = 0.25;
     SND.boss();
@@ -845,7 +845,7 @@
       ctx.textAlign = "center";
       ctx.fillStyle = "#cfe8ff";
       ctx.font = "bold 12px sans-serif";
-      ctx.fillText("❄ 빙하의 군주", W / 2, y - 4);
+      ctx.fillText("❄ 북극곰 우두머리", W / 2, y - 4);
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(m, y, bw, bh);
       ctx.fillStyle = "#ff5a6a";
@@ -1088,15 +1088,15 @@
     ctx.restore();
   }
 
-  // 적 종류별 몸 색(밝은쪽, 어두운쪽)
+  // 북극곰 종류별 털 색(밝은쪽, 그늘쪽)
   const ENEMY_COLORS = {
-    normal:   ["#bfe3ff", "#5fa3d8"],
-    fast:     ["#d0fff4", "#3fc6ad"],
-    tank:     ["#b9c8ff", "#4a63b8"],
-    splitter: ["#ecccff", "#9a5fd8"],
-    shell:    ["#bfe3ff", "#5fa3d8"],
-    ranged:   ["#ffe0c0", "#d88f4a"],
-    shard:    ["#ecccff", "#9a5fd8"],
+    normal:   ["#ffffff", "#ccdcea"],
+    fast:     ["#eafffb", "#aee3da"],
+    tank:     ["#ffffff", "#b7c6da"],
+    splitter: ["#fdf3ff", "#d8c4ea"],
+    shell:    ["#ffffff", "#ccdcea"],
+    ranged:   ["#fff4e6", "#e6c8a6"],
+    shard:    ["#fdf3ff", "#d8c4ea"],
   };
 
   // ---------- 얼음 몬스터 ----------
@@ -1117,40 +1117,63 @@
       ctx.beginPath(); ctx.ellipse(0, r * 0.9, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
 
       const c = ENEMY_COLORS[e.kind] || ENEMY_COLORS.normal;
-      const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 2, 0, 0, r);
-      if (e.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#cfe9ff"); }
+      const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 2, 0, 0, r * 1.1);
+      if (e.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#ffd0d0"); }
       else { grad.addColorStop(0, c[0]); grad.addColorStop(1, c[1]); }
-      ctx.fillStyle = grad;
-      ctx.strokeStyle = "rgba(30,70,110,0.5)";
-      ctx.lineWidth = 1.5;
+      const ol = "rgba(60,90,120,0.45)";
+      const lw = Math.max(1, 1.5 * sc);
+
+      // 어깨/덩치(머리 뒤)
+      ctx.fillStyle = c[1];
+      ctx.beginPath(); ctx.ellipse(0, r * 0.6, r * 1.05, r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+
+      // 귀
+      ctx.fillStyle = grad; ctx.strokeStyle = ol; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.6, r * 0.34, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.6, r * 0.34, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(120,150,180,0.5)";
+      ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.56, r * 0.16, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.56, r * 0.16, 0, Math.PI * 2); ctx.fill();
+
+      // 머리
+      ctx.fillStyle = grad; ctx.strokeStyle = ol; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+      // 주둥이
+      ctx.fillStyle = "rgba(228,240,250,0.96)";
+      ctx.beginPath(); ctx.ellipse(0, r * 0.42, r * 0.5, r * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      // 코
+      ctx.fillStyle = "#161b22";
+      ctx.beginPath(); ctx.ellipse(0, r * 0.2, r * 0.17, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+      // 입(으르렁)
+      ctx.strokeStyle = "#3a4654"; ctx.lineWidth = Math.max(1, 1.4 * sc);
       ctx.beginPath();
-      const spikes = e.big ? 9 : 7;
-      for (let i = 0; i <= spikes; i++) {
-        const a = (i / spikes) * Math.PI * 2;
-        const rr = r * (i % 2 ? 0.78 : 1.05);
-        const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.moveTo(0, r * 0.3); ctx.lineTo(0, r * 0.5);
+      ctx.moveTo(0, r * 0.5); ctx.quadraticCurveTo(-r * 0.22, r * 0.66, -r * 0.34, r * 0.48);
+      ctx.moveTo(0, r * 0.5); ctx.quadraticCurveTo(r * 0.22, r * 0.66, r * 0.34, r * 0.48);
+      ctx.stroke();
+      // 송곳니
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.14, r * 0.5); ctx.lineTo(-r * 0.08, r * 0.66); ctx.lineTo(-r * 0.02, r * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.14, r * 0.5); ctx.lineTo(r * 0.08, r * 0.66); ctx.lineTo(r * 0.02, r * 0.5);
+      ctx.closePath(); ctx.fill();
 
       // 화난 눈
       ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.arc(-r * 0.32, -r * 0.1, r * 0.24, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(r * 0.32, -r * 0.1, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-r * 0.36, -r * 0.12, r * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.36, -r * 0.12, r * 0.2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#c0392b";
-      ctx.beginPath(); ctx.arc(-r * 0.28, -r * 0.05, r * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(r * 0.36, -r * 0.05, r * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "#1d3a52"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(-r * 0.32, -r * 0.08, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.08, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      // 찡그린 눈썹
+      ctx.strokeStyle = "#1d3a52"; ctx.lineWidth = Math.max(1.5, 2.2 * sc);
       ctx.beginPath();
-      ctx.moveTo(-r * 0.6, -r * 0.5); ctx.lineTo(-r * 0.1, -r * 0.28);
-      ctx.moveTo(r * 0.6, -r * 0.5); ctx.lineTo(r * 0.1, -r * 0.28);
+      ctx.moveTo(-r * 0.62, -r * 0.46); ctx.lineTo(-r * 0.16, -r * 0.22);
+      ctx.moveTo(r * 0.62, -r * 0.46); ctx.lineTo(r * 0.16, -r * 0.22);
       ctx.stroke();
-      // 고드름 이빨
-      ctx.fillStyle = "#eaf6ff";
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.3, r * 0.35); ctx.lineTo(-r * 0.15, r * 0.7); ctx.lineTo(0, r * 0.35);
-      ctx.lineTo(r * 0.15, r * 0.7); ctx.lineTo(r * 0.3, r * 0.35);
-      ctx.closePath(); ctx.fill();
 
       // 원거리형: 머리 위 발사 노즐
       if (e.kind === "ranged") {
@@ -1217,7 +1240,7 @@
     }
   }
 
-  // ---------- 보스: 빙하의 군주 ----------
+  // ---------- 보스: 북극곰 우두머리 ----------
   function drawBoss() {
     const sc = projScale(boss.p);
     const r = boss.r * sc;
@@ -1228,40 +1251,68 @@
     ctx.fillStyle = "rgba(20,50,80,0.25)";
     ctx.beginPath(); ctx.ellipse(bx, by + r * 0.95, r, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 몸체(큰 얼음 결정)
+    // 거대 북극곰 우두머리
     ctx.save();
     ctx.translate(bx, by);
-    const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.4, 4, 0, 0, r);
-    if (boss.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#bcdcff"); }
-    else { grad.addColorStop(0, "#dff0ff"); grad.addColorStop(0.6, "#7fb6e8"); grad.addColorStop(1, "#3a6bb0"); }
-    ctx.fillStyle = grad;
-    ctx.strokeStyle = "rgba(20,50,90,0.6)";
-    ctx.lineWidth = 2.5;
+    const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.4, 4, 0, 0, r * 1.1);
+    if (boss.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#ffcaca"); }
+    else { grad.addColorStop(0, "#ffffff"); grad.addColorStop(0.65, "#e2eefb"); grad.addColorStop(1, "#b3c6dd"); }
+    const ol = "rgba(40,70,110,0.55)";
+
+    // 어깨/덩치
+    ctx.fillStyle = "#cdddec";
+    ctx.beginPath(); ctx.ellipse(0, r * 0.7, r * 1.25, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 귀
+    ctx.fillStyle = grad; ctx.strokeStyle = ol; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.62, r * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.62, r * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(120,150,180,0.5)";
+    ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.58, r * 0.17, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.58, r * 0.17, 0, Math.PI * 2); ctx.fill();
+
+    // 머리
+    ctx.fillStyle = grad; ctx.strokeStyle = ol; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // 주둥이 + 코 + 으르렁 입 + 송곳니
+    ctx.fillStyle = "rgba(230,242,252,0.97)";
+    ctx.beginPath(); ctx.ellipse(0, r * 0.44, r * 0.52, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#141a21";
+    ctx.beginPath(); ctx.ellipse(0, r * 0.22, r * 0.18, r * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#33414f"; ctx.lineWidth = 2;
     ctx.beginPath();
-    const spikes = 12;
-    for (let i = 0; i <= spikes; i++) {
-      const a = (i / spikes) * Math.PI * 2;
-      const rr = r * (i % 2 ? 0.82 : 1.08);
-      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.moveTo(0, r * 0.32); ctx.lineTo(0, r * 0.54);
+    ctx.moveTo(0, r * 0.54); ctx.quadraticCurveTo(-r * 0.24, r * 0.7, -r * 0.36, r * 0.5);
+    ctx.moveTo(0, r * 0.54); ctx.quadraticCurveTo(r * 0.24, r * 0.7, r * 0.36, r * 0.5);
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.moveTo(-r * 0.16, r * 0.54); ctx.lineTo(-r * 0.09, r * 0.72); ctx.lineTo(-r * 0.02, r * 0.54); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(r * 0.16, r * 0.54); ctx.lineTo(r * 0.09, r * 0.72); ctx.lineTo(r * 0.02, r * 0.54); ctx.closePath(); ctx.fill();
+
+    // 화난 눈
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(-r * 0.36, -r * 0.12, r * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.36, -r * 0.12, r * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#d01e2e";
+    ctx.beginPath(); ctx.arc(-r * 0.32, -r * 0.08, r * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.08, r * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#1d3a52"; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.64, -r * 0.48); ctx.lineTo(-r * 0.16, -r * 0.2);
+    ctx.moveTo(r * 0.64, -r * 0.48); ctx.lineTo(r * 0.16, -r * 0.2);
+    ctx.stroke();
 
     // 왕관
     ctx.fillStyle = "#ffd24a";
+    ctx.strokeStyle = "#c79520"; ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(-r * 0.55, -r * 0.9); ctx.lineTo(-r * 0.3, -r * 1.25);
-    ctx.lineTo(-r * 0.05, -r * 0.95); ctx.lineTo(r * 0.2, -r * 1.3);
-    ctx.lineTo(r * 0.45, -r * 0.92); ctx.lineTo(r * 0.55, -r * 0.78);
-    ctx.lineTo(-r * 0.55, -r * 0.78); ctx.closePath(); ctx.fill();
-
-    // 눈
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath(); ctx.arc(-r * 0.34, -r * 0.1, r * 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(r * 0.34, -r * 0.1, r * 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#d01e2e";
-    ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(r * 0.38, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.moveTo(-r * 0.6, -r * 0.86); ctx.lineTo(-r * 0.34, -r * 1.3);
+    ctx.lineTo(-r * 0.08, -r * 0.98); ctx.lineTo(r * 0.2, -r * 1.36);
+    ctx.lineTo(r * 0.46, -r * 0.96); ctx.lineTo(r * 0.6, -r * 0.84);
+    ctx.lineTo(-r * 0.6, -r * 0.84); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ff5a6a";
+    ctx.beginPath(); ctx.arc(0, -r * 0.92, r * 0.08, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
     // 머리 위 떠있는 HP바
