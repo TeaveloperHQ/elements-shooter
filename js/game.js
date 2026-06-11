@@ -107,6 +107,35 @@
   let bossNextAt = 0;    // 다음 보스 등장 시각(초)
   let combo = 0, comboTimer = 0;   // 연속 처치 콤보
   let hitStop = 0;       // 큰 이벤트 시 짧은 정지(손맛)
+  let runCoins = 0;      // 이번 판에 모은 코인
+
+  // ===================== 메타(영구 저장) =====================
+  const UPGRADE_MAX = 8;
+  const UP_BASE = { squad: 80, weapon: 60, shield: 70 };
+  const META = {
+    coins: 0, high: 0, dex: {}, up: { squad: 0, weapon: 0, shield: 0 },
+    load: function () {
+      try {
+        this.coins = +(localStorage.getItem("es_coins") || 0) || 0;
+        this.high = +(localStorage.getItem("es_high") || 0) || 0;
+        this.dex = JSON.parse(localStorage.getItem("es_dex") || "{}") || {};
+        this.up.squad = +(localStorage.getItem("es_up_squad") || 0) || 0;
+        this.up.weapon = +(localStorage.getItem("es_up_weapon") || 0) || 0;
+        this.up.shield = +(localStorage.getItem("es_up_shield") || 0) || 0;
+      } catch (e) {}
+    },
+    save: function () {
+      try {
+        localStorage.setItem("es_coins", this.coins);
+        localStorage.setItem("es_high", this.high);
+        localStorage.setItem("es_dex", JSON.stringify(this.dex));
+        localStorage.setItem("es_up_squad", this.up.squad);
+        localStorage.setItem("es_up_weapon", this.up.weapon);
+        localStorage.setItem("es_up_shield", this.up.shield);
+      } catch (e) {}
+    },
+  };
+  function upgradeCost(kind) { return UP_BASE[kind] * (META.up[kind] + 1); }
 
   let snow = [];
   let bergs = [];
@@ -114,9 +143,13 @@
   function newGame() {
     player = {
       x: W / 2, targetX: W / 2, y: 0,
-      squad: 3, weapon: 1, shield: 0, fireRate: 1,
+      squad: 3 + META.up.squad,
+      weapon: 1 + META.up.weapon,
+      shield: META.up.shield * 2,
+      fireRate: 1,
       bob: 0,
     };
+    runCoins = 0;
     bullets = [];
     enemies = [];
     gates = [];
@@ -172,7 +205,45 @@
   const overScreen = document.getElementById("over-screen");
 
   document.getElementById("start-btn").addEventListener("click", startGame);
-  document.getElementById("retry-btn").addEventListener("click", startGame);
+  document.getElementById("retry-btn").addEventListener("click", function () {
+    overScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");   // 다시 도전 → 상점 화면으로
+  });
+
+  // ---------- 상점/메타 UI ----------
+  function refreshMetaUI() {
+    const dexTotal = (typeof ELEMENTS !== "undefined") ? ELEMENTS.length : 15;
+    const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set("coin-total", META.coins);
+    set("high-score", META.high);
+    set("dex-count", Object.keys(META.dex).length);
+    set("dex-max", dexTotal);
+
+    const labels = { squad: "🐧 시작 펭귄", weapon: "🔫 시작 무기", shield: "🛡 시작 보호막" };
+    ["squad", "weapon", "shield"].forEach(function (kind) {
+      const btn = document.getElementById("up-" + kind);
+      if (!btn) return;
+      const lvl = META.up[kind], maxed = lvl >= UPGRADE_MAX, cost = upgradeCost(kind);
+      const info = btn.querySelector(".up-info");
+      btn.classList.toggle("maxed", maxed);
+      btn.classList.toggle("cant", !maxed && META.coins < cost);
+      if (info) info.textContent = maxed ? "Lv." + lvl + " MAX" : "Lv." + lvl + " · 🪙" + cost;
+    });
+  }
+
+  function buyUpgrade(kind) {
+    const lvl = META.up[kind];
+    if (lvl >= UPGRADE_MAX) return;
+    const cost = upgradeCost(kind);
+    if (META.coins < cost) { SND.breach(); return; }
+    META.coins -= cost; META.up[kind]++; META.save();
+    SND.item();
+    refreshMetaUI();
+  }
+  ["squad", "weapon", "shield"].forEach(function (kind) {
+    const btn = document.getElementById("up-" + kind);
+    if (btn) btn.addEventListener("click", function () { initAudio(); buyUpgrade(kind); });
+  });
 
   function startGame() {
     initAudio();
@@ -184,11 +255,25 @@
   }
   function gameOver() {
     state = STATE.OVER;
-    document.getElementById("final-score").textContent = Math.floor(score);
+    const finalScore = Math.floor(score);
+    document.getElementById("final-score").textContent = finalScore;
+
+    // 코인 적립 + 도감 갱신 + 최고점수
+    META.coins += runCoins;
+    for (const sym in learned) META.dex[sym] = true;
+    const isRecord = finalScore > META.high;
+    if (isRecord) META.high = finalScore;
+    META.save();
+
+    document.getElementById("run-coins").innerHTML =
+      "🪙 이번 판 코인 <b>+" + runCoins + "</b>" + (isRecord ? "　🏆 <b>신기록!</b>" : "");
+
     const names = Object.keys(learned);
     document.getElementById("elements-learned").innerHTML =
       names.length ? "오늘 만난 원소: <b>" + names.join(", ") + "</b>"
                    : "이번엔 원소를 만나지 못했어요!";
+
+    refreshMetaUI();
     overScreen.classList.remove("hidden");
   }
 
@@ -197,6 +282,7 @@
     document.getElementById("hud-squad").textContent = player.squad;
     document.getElementById("hud-weapon").textContent = player.weapon;
     document.getElementById("hud-shield").textContent = player.shield;
+    document.getElementById("hud-coins").textContent = runCoins;
     document.getElementById("hud-score").textContent = Math.floor(score);
   }
 
@@ -243,6 +329,7 @@
     spawnParticles(g.cx, g.cy, panel.el.color, 24, 240);
     spawnParticles(g.cx, g.cy, "#ffffff", 14, 280);
     spawnItem(g.cx, g.cy);
+    runCoins += 5;
     shake = Math.min(16, shake + 11);
     hitStop = 0.06; SND.explode();
     learned[panel.el.symbol] = true;
@@ -436,6 +523,7 @@
     const base = e.kind === "tank" ? 30 : (e.kind === "shard" ? 5 : 10);
     const pts = base * mult;
     score += pts;
+    runCoins += e.kind === "tank" ? 4 : (e.kind === "shard" ? 1 : 1);
     spawnText(ex, ey - e.r * projScale(e.p), "+" + pts, mult > 1 ? "#ffe678" : "#eaffd0", e.big ? 16 : 13);
     SND.kill();
     if (combo > 1 && combo % 5 === 0) SND.combo(combo / 5);
@@ -560,6 +648,7 @@
     spawnParticles(bx, by, "#bfe6ff", 50, 320);
     spawnParticles(bx, by, "#ffffff", 30, 360);
     score += 1500;
+    runCoins += 30;
     spawnText(bx, by, "보스 처치! +1500", "#ffe678", 26);
     // 화면 정리 + 보상
     enemies.length = 0; eBullets.length = 0;
@@ -1287,6 +1376,8 @@
     requestAnimationFrame(loop);
   }
 
+  META.load();
+  refreshMetaUI();
   resize();
   requestAnimationFrame(loop);
 })();

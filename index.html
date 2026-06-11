@@ -15,6 +15,7 @@
       <div class="hud-item">🐧 <span id="hud-squad">1</span></div>
       <div class="hud-item">무기 Lv.<span id="hud-weapon">1</span></div>
       <div class="hud-item">🛡 <span id="hud-shield">0</span></div>
+      <div class="hud-item">🪙 <span id="hud-coins">0</span></div>
       <div class="hud-item">점수 <span id="hud-score">0</span></div>
     </div>
 
@@ -36,6 +37,21 @@
         <span>🖱 좌우 이동: 마우스 / 터치 / ← →</span>
         <span>❄️ 눈덩이 사격: 자동</span>
       </div>
+
+      <!-- 메타: 코인/최고점수/도감 + 영구 업그레이드 상점 -->
+      <div id="meta">
+        <div class="meta-row">
+          <span>🪙 <b id="coin-total">0</b></span>
+          <span>🏆 <b id="high-score">0</b></span>
+          <span>📖 <b id="dex-count">0</b>/<span id="dex-max">15</span></span>
+        </div>
+        <div class="shop">
+          <button class="up-btn" id="up-squad">🐧 시작 펭귄<br /><span class="up-info"></span></button>
+          <button class="up-btn" id="up-weapon">🔫 시작 무기<br /><span class="up-info"></span></button>
+          <button class="up-btn" id="up-shield">🛡 시작 보호막<br /><span class="up-info"></span></button>
+        </div>
+      </div>
+
       <button id="start-btn" class="btn">게임 시작</button>
     </div>
 
@@ -44,6 +60,7 @@
       <h1>게임 오버</h1>
       <p class="desc">최종 점수</p>
       <p id="final-score" class="final-score">0</p>
+      <p id="run-coins" class="run-coins"></p>
       <p id="elements-learned" class="learned"></p>
       <button id="retry-btn" class="btn">다시 도전</button>
     </div>
