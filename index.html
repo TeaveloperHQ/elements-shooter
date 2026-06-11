@@ -37,18 +37,13 @@
     <div id="start-screen" class="overlay">
       <h1>🐧 펭귄 남극 대원정</h1>
       <p class="subtitle">Antarctic Adventure</p>
-      <p class="desc">
-        <b>남극 → 북극</b> 세계 일주! 상단 지도로 경로를 확인해요.<br />
-        🥫 <b>정어리 통조림</b>을 주워 모으고, 🔧 <b>따개</b>로 열어 <b>먹으면 ⚡에너지 충전!</b><br />
-        <b>안 먹으면 배고파서 점프를 못 해요.</b><br />
-        <b>얼음 크레바스</b>는 <b>점프</b>로 넘고,<br />
-        <b>거대 크레바스</b>는 점프 버튼을 <b>꾹 눌러 날갯짓으로 날아서</b> 건너요!<br />
-        <span class="warn">❄ 크레바스에 빠지면 즉시 아웃! 에너지를 잘 관리하세요.</span>
-      </p>
-      <div class="controls-info">
-        <span>🖱 좌우 이동: 마우스 / 터치 / ← →</span>
-        <span>⬆️ 점프·비행: 클릭/탭/Space를 <b>꾹</b> (에너지 소모)</span>
+      <div class="howto">
+        <div class="ht"><span class="ht-i">🗺️</span><span><b>남극 → 북극</b> 세계 일주! 상단 지도로 경로 확인</span></div>
+        <div class="ht"><span class="ht-i">🥫</span><span><b>정어리 통조림</b> 모으고 <b>🔧 따개</b>로 까서 <b>⚡에너지</b> 충전</span></div>
+        <div class="ht"><span class="ht-i">⬆️</span><span><b>점프</b>로 크레바스 넘기 · <b>꾹 눌러</b> 날아서 거대 협곡 건너기</span></div>
+        <div class="ht warn"><span class="ht-i">❄️</span><span>에너지 없으면 못 날고, <b>협곡 가운데 빠지면 아웃!</b></span></div>
       </div>
+      <p class="controls-line">🖱 이동: 마우스·터치·←→ &nbsp;·&nbsp; ⬆️ 점프/비행: 클릭·탭·Space <b>꾹</b></p>
 
       <!-- 메타: 코인/최고점수/도감 + 영구 업그레이드 상점 -->
       <div id="meta">
@@ -69,11 +64,13 @@
 
     <!-- 게임오버 화면 -->
     <div id="over-screen" class="overlay hidden">
-      <h1>게임 오버</h1>
-      <p class="desc">최종 점수</p>
-      <p id="final-score" class="final-score">0</p>
-      <p id="run-coins" class="run-coins"></p>
-      <p id="elements-learned" class="learned"></p>
+      <h1>🐧 여정 종료</h1>
+      <div class="result">
+        <p class="result-label">최종 점수</p>
+        <p id="final-score" class="final-score">0</p>
+        <p id="run-coins" class="run-coins"></p>
+        <p id="elements-learned" class="learned"></p>
+      </div>
       <button id="retry-btn" class="btn">다시 도전</button>
     </div>
   </div>

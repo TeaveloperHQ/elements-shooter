@@ -99,7 +99,7 @@ canvas#game {
   justify-content: center;
   text-align: center;
   padding: 24px;
-  background: radial-gradient(circle at 50% 28%, rgba(45, 120, 175, 0.88), rgba(8, 24, 40, 0.96));
+  background: radial-gradient(circle at 50% 26%, rgba(36, 104, 158, 0.72), rgba(7, 20, 36, 0.93));
   z-index: 10;
 }
 
@@ -134,6 +134,79 @@ canvas#game {
   color: #ff9a9a;
   font-weight: 700;
   font-size: 13px;
+}
+
+/* ---------- 시작화면 플레이 방법 패널 ---------- */
+.howto {
+  width: 100%;
+  max-width: 340px;
+  background: rgba(8, 22, 40, 0.55);
+  border: 1px solid rgba(120, 180, 230, 0.3);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ht {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #d2dded;
+  padding: 4px 0;
+}
+
+.ht + .ht {
+  border-top: 1px solid rgba(120, 170, 220, 0.12);
+}
+
+.ht-i {
+  flex: 0 0 24px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.ht.warn {
+  color: #ffb0b0;
+}
+
+.ht b {
+  color: #eaf6ff;
+}
+
+.ht.warn b {
+  color: #ffd0d0;
+}
+
+.controls-line {
+  font-size: 11.5px;
+  color: #8fa6bd;
+  margin-bottom: 20px;
+}
+
+/* ---------- 게임오버 결과 카드 ---------- */
+.result {
+  width: 100%;
+  max-width: 320px;
+  background: rgba(8, 22, 40, 0.55);
+  border: 1px solid rgba(120, 180, 230, 0.3);
+  border-radius: 16px;
+  padding: 18px 16px 16px;
+  margin-bottom: 26px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.result-label {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #8fb6d6;
+}
+
+.result .final-score {
+  margin: 2px 0 10px;
 }
 
 .controls-info {

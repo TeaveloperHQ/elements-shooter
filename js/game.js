@@ -1404,6 +1404,12 @@
   if (location.search.indexOf("auto") >= 0 || location.hash.indexOf("auto") >= 0) {
     startGame();
   }
+  // ?over: 게임오버 화면 미리보기
+  if (location.search.indexOf("over") >= 0) {
+    startGame(); distance = 3120; score = 1480; runCoins = 26;
+    learned = { Fe: 1, Cu: 1, Ti: 1, Au: 1, He: 1 };
+    gameOver();
+  }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
     startGame(); state = STATE.PLAY; galleryMode = true;
