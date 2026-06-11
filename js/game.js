@@ -1083,10 +1083,10 @@
     ctx.beginPath(); ctx.ellipse(0, 9 * sc, 3.6 * sc, 8 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.ellipse(-1.3 * sc, 6 * sc, 1.1 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 헤드(둥근 흰/아이시 몸체 + 금테)
+    // 헤드(둥근 흰/아이시 몸체 + 파란 테)
     const headg = ctx.createRadialGradient(-2.5 * sc, -3.5 * sc, 1, 0, -2 * sc, 9 * sc);
     headg.addColorStop(0, "#ffffff"); headg.addColorStop(1, "#dceaf6");
-    ctx.fillStyle = headg; ctx.strokeStyle = "#ffd24a"; ctx.lineWidth = Math.max(1.5, 1.9 * sc);
+    ctx.fillStyle = headg; ctx.strokeStyle = "#6fc3ff"; ctx.lineWidth = Math.max(1.5, 1.9 * sc);
     ctx.beginPath(); ctx.ellipse(0, -2 * sc, 8.5 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
     // 톱니 절단바퀴(연한 파랑 + 별 중심)
@@ -1101,11 +1101,11 @@
     ctx.closePath(); ctx.fill(); ctx.stroke();
     oSparkle(gx, gyy, 1.7 * sc, "#ffffff");
 
-    // 나비 돌림 노브(금색 둥근 날개)
-    ctx.fillStyle = "#ffd24a"; ctx.strokeStyle = "#d9a420"; ctx.lineWidth = Math.max(1, sc * 0.8);
+    // 나비 돌림 노브(푸른 둥근 날개)
+    ctx.fillStyle = "#7fd0ff"; ctx.strokeStyle = "#2f8fe0"; ctx.lineWidth = Math.max(1, sc * 0.8);
     ctx.beginPath(); ctx.ellipse(7.8 * sc, -3.6 * sc, 3.2 * sc, 2 * sc, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(7.8 * sc, 0.4 * sc, 3.2 * sc, 2 * sc, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fff3c0"; ctx.beginPath(); ctx.arc(7.8 * sc, -1.6 * sc, 1.1 * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#eaf6ff"; ctx.beginPath(); ctx.arc(7.8 * sc, -1.6 * sc, 1.1 * sc, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
     // 반짝임
