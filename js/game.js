@@ -1190,9 +1190,18 @@
     ctx.beginPath();
     for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr + ry * 0.2; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 얼음 잔금(가장자리→안쪽)
-    ctx.strokeStyle = "rgba(205,234,250,0.45)"; ctx.lineWidth = Math.max(0.8, sc);
-    for (let k = 0; k < 3; k++) { const a = 0.4 + k * 2.1; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * rx * 0.92, y + Math.sin(a) * ry * 0.92); ctx.lineTo(cx + Math.cos(a) * rx * 0.4, y + Math.sin(a) * ry * 0.4); ctx.stroke(); }
+    // 세로 빙벽 결(단면 디테일)
+    ctx.strokeStyle = "rgba(150,200,235,0.4)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
+    for (let k = -2; k <= 2; k++) {
+      const px = cx + k * rx * 0.3, len = 0.45 + shp[(k + 5) % n] * 0.35;
+      ctx.beginPath(); ctx.moveTo(px, y - ry * 0.5); ctx.lineTo(px, y + ry * len); ctx.stroke();
+    }
+    // 위 가장자리 고드름(아래로)
+    ctx.fillStyle = "rgba(228,246,255,0.88)";
+    for (let k = -2; k <= 2; k++) {
+      const px = cx + k * rx * 0.28 + rx * 0.06, ty = y - ry * 0.62, il = (3 + shp[(k + 3) % n] * 4) * sc;
+      ctx.beginPath(); ctx.moveTo(px - 2 * sc, ty); ctx.lineTo(px + 2 * sc, ty); ctx.lineTo(px, ty + il); ctx.closePath(); ctx.fill();
+    }
     // 깨진 얼음 테
     ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
@@ -1228,9 +1237,19 @@
     ctx.moveTo(fcx - frx * 0.8, fy - (fy - by) * 0.16); ctx.lineTo(fcx + frx * 0.8, fy - (fy - by) * 0.16);
     ctx.lineTo(bcx + brx * 0.82, by + (fy - by) * 0.1); ctx.lineTo(bcx - brx * 0.82, by + (fy - by) * 0.1);
     ctx.closePath(); ctx.fill();
-    // 얼음 잔금(가로 단층)
-    ctx.strokeStyle = "rgba(150,195,225,0.3)"; ctx.lineWidth = Math.max(0.8, sc);
-    for (let k = 1; k <= 2; k++) { const t = k / 3; const yy = by + (fy - by) * t; const cxk = bcx + (fcx - bcx) * t, hk = (brx + (frx - brx) * t) * 0.7; ctx.beginPath(); ctx.moveTo(cxk - hk, yy); ctx.lineTo(cxk + hk, yy); ctx.stroke(); }
+    // 세로 빙벽 결(앞↔뒤를 잇는 얼음 기둥)
+    ctx.strokeStyle = "rgba(150,200,235,0.32)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
+    for (let k = 0; k <= 6; k++) {
+      const f = k / 6;
+      const tx = bcx + (f - 0.5) * 2 * brx * 0.85, bxn = fcx + (f - 0.5) * 2 * frx * 0.85;
+      ctx.beginPath(); ctx.moveTo(tx, by); ctx.lineTo(bxn, fy); ctx.stroke();
+    }
+    // 뒤 가장자리 고드름(아래로)
+    ctx.fillStyle = "rgba(228,246,255,0.85)";
+    for (let k = 0; k <= 6; k++) {
+      const f = (k + 0.5) / 7, tx = bcx + (f - 0.5) * 2 * brx * 0.8, il = (3 + shp[k % n] * 4) * sc;
+      ctx.beginPath(); ctx.moveTo(tx - 2 * sc, by); ctx.lineTo(tx + 2 * sc, by); ctx.lineTo(tx, by + il); ctx.closePath(); ctx.fill();
+    }
     // 앞 가장자리 들쭉날쭉 얼음 테
     ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     ctx.beginPath();
