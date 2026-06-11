@@ -229,12 +229,12 @@
       // 얼음 크레바스 — 크기 1/3 ~ 2/3, 랜덤 갈라진 모양
       const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;   // -0.4 / 0 / 0.4
       const w = (1 / 3) + Math.random() * (1 / 3);
-      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10 + Math.random() * 0.02, done: false, w: w, shape: makeJagged() });
+      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, w: w, shape: makeJagged() });
     } else if (r < 0.86) {
       // 정어리 통조림 (겉면에 원소 기호)
       const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
       items.push({ type: "can", el: el, lane: -0.75 + Math.random() * 1.5,
-        p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
+        p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     } else {
       // 통조림 따개 — 가능하면 모아둔 통조림과 일치하는 원소로(매칭 유도)
       let el;
@@ -245,7 +245,7 @@
         el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
       }
       items.push({ type: "opener", el: el, lane: -0.7 + Math.random() * 1.4,
-        p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
+        p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     }
   }
 
@@ -256,12 +256,12 @@
       // 이번 스테이지의 전세계 명물(크게, 멀리)
       const lm = stageLandmark();
       scenery.push({ type: "landmark", key: lm.key, lane: side * (1.75 + Math.random() * 0.7),
-        p: 0, vp: 0.085 + Math.random() * 0.015, flip: side < 0 });
+        p: 0, vp: 0.10, flip: side < 0 });
     } else {
       const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
       const type = types[(Math.random() * types.length) | 0];
       scenery.push({ type: type, lane: side * (1.25 + Math.random() * 0.7),
-        p: 0, vp: 0.10 + Math.random() * 0.02, flip: side < 0 });
+        p: 0, vp: 0.10, flip: side < 0 });
     }
   }
 
@@ -826,10 +826,24 @@
     ctx.textAlign = "start"; ctx.restore();
   }
 
+  // 줍기 표적 마커: 펭귄과 정렬되면 초록으로 빛난다(정확히 먹는지 보이게)
+  function drawCatchMarker(x, gy, sc, o) {
+    if (o.p < 0.45 || !player) return;
+    const cr = 36 + META.up.magnet * 8;
+    const aligned = player.onGround && Math.abs(player.x - x) < cr;
+    ctx.fillStyle = aligned ? "rgba(120,240,150,0.32)" : "rgba(150,190,220,0.16)";
+    ctx.beginPath(); ctx.ellipse(x, gy, 10 * sc, 3.2 * sc, 0, 0, Math.PI * 2); ctx.fill();
+    if (aligned) {
+      ctx.strokeStyle = "rgba(150,255,180,0.95)"; ctx.lineWidth = Math.max(1.5, 2 * sc);
+      ctx.beginPath(); ctx.ellipse(x, gy, 12.5 * sc, 4 * sc, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
   // 정어리 통조림(원소 기호)
   function drawCan(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
+    drawCatchMarker(x, gy, sc, o);
     const cw = 24 * sc, ch = 17 * sc;
     const top = gy - ch - (3 + Math.sin(o.wave) * 2) * sc;
     ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, cw * 0.5, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
@@ -852,6 +866,7 @@
   function drawOpener(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
+    drawCatchMarker(x, gy, sc, o);
     const bob = Math.sin(o.wave) * 2 * sc;
     const hy = gy - 16 * sc + bob;     // 도구 본체 중심
 
@@ -923,6 +938,13 @@
   // ---------- 펭귄(뒤에서 본 달리기) ----------
   function drawPlayer() {
     const x = player.x, y = player.y, lift = player.jumpY;
+    // 줍기 가능 구역(바닥에서만 작동)
+    if (state === STATE.PLAY && player.onGround) {
+      const cr = 36 + META.up.magnet * 8;
+      ctx.strokeStyle = "rgba(150,230,180,0.45)"; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.ellipse(x, y + 9, cr, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     const shS = 1 - Math.min(0.55, lift / 150);
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
