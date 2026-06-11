@@ -296,11 +296,13 @@
   // 빙판 길로 다가오는 장애물:
   //  - 함정(trap): 위험 원소(방사능·독성). 점프로 넘어야 한다. 못 넘으면 페널티.
   //  - 정어리(sardine): 안전 원소 배지를 단 물고기. 땅에서 주우면 강화 + 원소 학습.
+  const TRAP_HALF = 0.45;   // 구덩이 반폭(길 반폭 대비) — 최대 너비가 길의 약 절반
   function spawnObstacle() {
     // 약 55% 함정, 45% 정어리
     if (Math.random() < 0.55) {
       const el = TRAP_ELEMENTS[(Math.random() * TRAP_ELEMENTS.length) | 0];
-      obstacles.push({ type: "trap", el: el, lane: 0, p: 0.0,
+      const lane = (-1 + ((Math.random() * 3) | 0)) * 0.5;   // -0.5 / 0 / 0.5
+      obstacles.push({ type: "trap", el: el, lane: lane, p: 0.0,
         vp: 0.085 + Math.random() * 0.02, done: false });
     } else {
       const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
@@ -656,25 +658,32 @@
     }
   }
 
-  // 함정: 점프로 넘으면 안전(+학습), 못 넘으면 페널티
+  // 함정: 점프로 넘거나 옆으로 피하면 안전, 구덩이 위에 서 있으면 페널티
   function hitTrap(o, ox) {
     const el = o.el;
-    learned[el.symbol] = true;
+    const tHalf = halfAt(1) * TRAP_HALF;       // 구덩이 화면 반폭(p=1)
+    const overHole = Math.abs(player.x - ox) < tHalf + 10;
+
     if (player.jumpY > 18) {
-      // 점프 회피 성공
+      // 점프로 넘음 → 학습 + 보너스
+      learned[el.symbol] = true;
       score += 30; runCoins += 1;
-      spawnText(player.x, playerLineY() - player.jumpY - 40, "점프 회피! +30", "#aef0c0", 18);
+      spawnText(player.x, playerLineY() - player.jumpY - 40, "점프! +30", "#aef0c0", 18);
       spawnParticles(player.x, playerLineY(), "#bfe6ff", 8, 150);
       showToast(el.symbol + " " + el.name + " — " + el.fact, true);
       SND.item();
-    } else {
-      // 함정에 빠짐 → 페널티
+    } else if (overHole) {
+      // 구덩이에 빠짐 → 페널티 + 위험 원소 설명
+      learned[el.symbol] = true;
       applyElementEffect(el, -1);
       spawnParticles(ox, playerLineY(), "#9ab8d0", 16, 220);
       combo = 0; lineFlash = 0.5; screenFlash = 0.32;
       shake = Math.min(18, shake + 11);
       SND.breach();
       showToast("⚠ " + el.symbol + " " + el.name + " — " + el.fact, true);
+    } else {
+      // 옆으로 피함 → 무사
+      spawnText(player.x, playerLineY() - 40, "회피!", "#cfe6ff", 16);
     }
     updateHUD();
     if (player.squad <= 0) gameOver();
@@ -1398,44 +1407,48 @@
     ctx.restore();
   }
 
-  // 함정: 빙판을 가로지르는 크레바스(구멍) + 위험 원소 배지
+  // 함정: 빙판의 얼음 구덩이(짙은 얼음색) + 위험 원소 배지
   function drawTrap(o) {
     const sc = projScale(o.p);
     const y = projY(o.p);
-    const half = halfAt(o.p);
-    const cx = W / 2;
-    const ry = 11 * sc + 5;
+    const cx = laneToX(o.p, o.lane);
+    const rx = halfAt(o.p) * TRAP_HALF;   // 길의 약 절반 폭으로 제한
+    const ry = rx * 0.42;
 
     ctx.save();
-    // 구멍(깊이 그라데이션)
-    const g = ctx.createRadialGradient(cx, y, 2, cx, y, half);
-    g.addColorStop(0, "rgba(0,0,0,0.92)");
-    g.addColorStop(0.7, "rgba(10,30,55,0.8)");
-    g.addColorStop(1, "rgba(30,70,110,0.35)");
+    // 얼음 구덩이(짙은 청록 → 옅은 얼음색, 깊이감)
+    const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
+    g.addColorStop(0, "#0e3550");
+    g.addColorStop(0.55, "#19567a");
+    g.addColorStop(1, "#3f86ad");
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(cx, y, half * 0.96, ry, 0, 0, Math.PI * 2); ctx.fill();
-    // 깨진 얼음 가장자리
-    ctx.strokeStyle = "rgba(205,238,255,0.85)";
+    ctx.beginPath(); ctx.ellipse(cx, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    // 물/얼음 반짝임(안쪽)
+    ctx.fillStyle = "rgba(180,225,245,0.35)";
+    ctx.beginPath(); ctx.ellipse(cx - rx * 0.25, y - ry * 0.25, rx * 0.35, ry * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // 깨진 얼음 가장자리(밝은 테)
+    ctx.strokeStyle = "rgba(225,245,255,0.9)";
     ctx.lineWidth = Math.max(1.5, 2.5 * sc);
-    ctx.beginPath(); ctx.ellipse(cx, y, half * 0.96, ry, 0, 0, Math.PI * 2); ctx.stroke();
-    // 톱니 얼음조각
-    ctx.fillStyle = "rgba(225,245,255,0.9)";
-    for (let k = -3; k <= 3; k++) {
-      const px = cx + k * half * 0.28;
+    ctx.beginPath(); ctx.ellipse(cx, y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    // 갈라진 얼음 조각(가장자리 위)
+    ctx.fillStyle = "rgba(230,247,255,0.95)";
+    for (let k = -2; k <= 2; k++) {
+      const px = cx + k * rx * 0.4;
       ctx.beginPath();
-      ctx.moveTo(px - 4 * sc, y - ry); ctx.lineTo(px, y - ry - 6 * sc); ctx.lineTo(px + 4 * sc, y - ry);
+      ctx.moveTo(px - 3 * sc, y - ry); ctx.lineTo(px, y - ry - 5 * sc); ctx.lineTo(px + 3 * sc, y - ry);
       ctx.closePath(); ctx.fill();
     }
     ctx.restore();
 
-    // 위험 원소 배지(구멍 위에 떠 있음)
-    drawElementBadge(cx, y - ry - 22 * sc - 8, 16 * sc + 9, o.el, true);
+    // 위험 원소 배지(구덩이 위에 떠 있음)
+    const badgeY = y - ry - 20 * sc - 6;
+    drawElementBadge(cx, badgeY, 14 * sc + 8, o.el, true);
     // 경고
     ctx.save();
     ctx.globalAlpha = 0.8;
     ctx.fillStyle = "#ff8a8a"; ctx.textAlign = "center";
-    ctx.font = "bold " + (10 * sc + 7) + "px sans-serif";
-    ctx.fillText("⚠ 점프!", cx, y - ry - 22 * sc - 8 - (16 * sc + 9) - 5);
+    ctx.font = "bold " + (9 * sc + 6) + "px sans-serif";
+    ctx.fillText("⚠ 점프!", cx, badgeY - (14 * sc + 8) - 4);
     ctx.textAlign = "start"; ctx.restore();
   }
 
@@ -1443,12 +1456,12 @@
   function drawSardine(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane);
-    const y = projY(o.p) - (8 + Math.sin(o.bob) * 3) * sc;
-    const L = 16 * sc + 7;
+    const y = projY(o.p) - (6 + Math.sin(o.bob) * 2.5) * sc;
+    const L = 8 * sc + 3;   // 작은 물고기
 
     // 바닥 그림자
     ctx.fillStyle = "rgba(40,80,120,0.18)";
-    ctx.beginPath(); ctx.ellipse(x, projY(o.p), L * 0.8, 3 * sc + 1.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, projY(o.p), L * 0.8, 2.5 * sc + 1, 0, 0, Math.PI * 2); ctx.fill();
 
     ctx.save();
     ctx.translate(x, y);
@@ -1468,7 +1481,7 @@
     ctx.restore();
 
     // 안전 원소 배지(물고기 위)
-    drawElementBadge(x, y - L - 12 * sc, 13 * sc + 8, o.el, false);
+    drawElementBadge(x, y - L - 14 * sc - 4, 11 * sc + 7, o.el, false);
   }
 
   function drawParticles() {
