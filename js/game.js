@@ -21,7 +21,7 @@
     dpr = window.devicePixelRatio || 1;
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    buildSnow(); buildBergs();
+    buildSnow(); buildBergs(); buildStars(); buildIce();
   }
   window.addEventListener("resize", resize);
 
@@ -98,7 +98,7 @@
   ];
   function stageIndex() { return Math.min(STAGES.length - 1, Math.floor(distance / STAGE_LEN)); }
   function stageLandmark() { return STAGES[stageIndex()]; }
-  let snow = [], bergs = [], scenery = [];
+  let snow = [], bergs = [], scenery = [], stars = [], iceFx = [];
 
   // ===================== 메타(영구 저장) =====================
   const UPGRADE_MAX = 8;
@@ -531,6 +531,22 @@
       if (s.x < -4) s.x = W + 4; else if (s.x > W + 4) s.x = -4;
     }
   }
+  function buildStars() {
+    stars = [];
+    const n = Math.round(W / 14);
+    for (let i = 0; i < n; i++) stars.push({ x: Math.random() * W, y: Math.random() * horizonY() * 0.78,
+      r: 0.5 + Math.random() * 1.1, a: 0.3 + Math.random() * 0.6, tw: Math.random() * 6.28 });
+  }
+  function buildIce() {
+    // 길 위 얼음 디테일(반짝임/잔금) — 깊이 u(0..1)와 레인으로 고정, 스크롤된다
+    iceFx = [];
+    const n = 22;
+    for (let i = 0; i < n; i++) iceFx.push({
+      u: Math.random(), lane: -0.82 + Math.random() * 1.64,
+      kind: Math.random() < 0.55 ? "sparkle" : "crack",
+      r: 0.6 + Math.random() * 1.1, a: Math.random() * Math.PI,
+    });
+  }
   function buildBergs() {
     bergs = [];
     // 뒤(멀고 어두움) → 앞(가깝고 밝음) 2겹, 모양/높이/봉우리 위치 제각각
@@ -640,6 +656,14 @@
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
     const hy = horizonY();
 
+    // 별(은은하게 반짝)
+    for (const st of stars) {
+      ctx.globalAlpha = st.a * (0.6 + 0.4 * Math.sin(elapsed * 2 + st.tw));
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
     // 오로라
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < 3; i++) {
@@ -678,6 +702,11 @@
         ctx.closePath(); ctx.fill();
       }
     }
+
+    // 지평선 안개(하늘↔빙원 부드럽게 + 깊이감)
+    const fog = ctx.createLinearGradient(0, hy - 26, 0, hy + 30);
+    fog.addColorStop(0, "rgba(225,242,252,0)"); fog.addColorStop(0.5, "rgba(228,243,252,0.75)"); fog.addColorStop(1, "rgba(230,244,253,0)");
+    ctx.fillStyle = fog; ctx.fillRect(0, hy - 26, W, 56);
 
     // 빙판 길(굽이치는 트랙) — 슬라이스로 그린다
     const pBottom = (H - hy) / (playerLineY() - hy);   // 화면 맨 아래까지의 깊이
@@ -750,6 +779,24 @@
       const p0 = u0 * pBottom, p1 = u1 * pBottom;
       ctx.globalAlpha = Math.min(1, u0 * 2);
       ctx.beginPath(); ctx.moveTo(curveCenterX(p0), projY(p0)); ctx.lineTo(curveCenterX(p1), projY(p1)); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // 길 위 얼음 디테일(반짝임/잔금) — 깊이 따라 스크롤
+    for (const f of iceFx) {
+      const u = (f.u + (scrollY / 80)) % 1;
+      const p = u * pBottom, sc = projScale(p);
+      const fx = laneToX(p, f.lane), fy = projY(p);
+      const a = Math.min(1, u * 1.8);
+      if (f.kind === "sparkle") {
+        ctx.globalAlpha = a * 0.55 * (0.6 + 0.4 * Math.sin(elapsed * 3 + f.a));
+        ctx.fillStyle = "#ffffff";
+        oSparkle(fx, fy, (f.r + 0.5) * sc * 1.6, "#ffffff");
+      } else {
+        ctx.globalAlpha = a * 0.22; ctx.strokeStyle = "#9fc4e0"; ctx.lineWidth = Math.max(1, sc);
+        const dx = Math.cos(f.a) * 7 * sc, dy = Math.sin(f.a) * 2.5 * sc;
+        ctx.beginPath(); ctx.moveTo(fx - dx, fy - dy); ctx.lineTo(fx + dx, fy + dy); ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -1226,7 +1273,7 @@
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
     const flying = !player.onGround && holdJump && player.energy > 0;
-    drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0, flying, player.flapT, player.tumble);
+    drawPenguin(x, y - lift, 2.0, player.run, player.stun > 0, flying, player.flapT, player.tumble);
   }
 
   function drawPenguin(x, y, s, phase, stun, fly, flapPhase, tumble) {
