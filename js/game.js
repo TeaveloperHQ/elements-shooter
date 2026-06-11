@@ -66,13 +66,15 @@
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
   let state = STATE.MENU;
 
-  let player, bullets, enemies, gates, particles, flashes, items, texts;
+  let player, bullets, enemies, gates, particles, flashes, items, texts, eBullets;
   let score, learned;
   let spawnTimer, gateTimer, fireTimer, elapsed;
   let scrollY = 0;
   let shake = 0;
   let lineFlash = 0;     // 방어선 돌파 시 빨강 번쩍
   let screenFlash = 0;   // 피격 시 화면 빨강 플래시
+  let boss = null;       // 현재 보스(없으면 null)
+  let bossNextAt = 0;    // 다음 보스 등장 시각(초)
 
   let snow = [];
   let bergs = [];
@@ -90,6 +92,9 @@
     flashes = [];
     items = [];
     texts = [];
+    eBullets = [];
+    boss = null;
+    bossNextAt = 35;
     score = 0;
     learned = {};
     spawnTimer = 0;
@@ -226,15 +231,21 @@
     fireTimer -= dt;
     if (fireTimer <= 0) { fireTimer = fireInterval; fireVolley(); }
 
-    const spawnInterval = Math.max(0.45, 1.5 - elapsed * 0.013);
+    // 보스가 없을 때만 잡몹 스폰(보스 중엔 조금만)
+    const spawnInterval = Math.max(0.45, 1.5 - elapsed * 0.013) * (boss ? 2.2 : 1);
     spawnTimer -= dt;
     if (spawnTimer <= 0) { spawnTimer = spawnInterval; spawnEnemy(); }
+
+    // 보스 웨이브
+    if (!boss && elapsed >= bossNextAt) spawnBoss();
 
     gateTimer -= dt;
     if (gateTimer <= 0) { gateTimer = 5.5; spawnGatePair(); }
 
     updateBullets(dt);
     updateEnemies(dt);
+    updateEBullets(dt);
+    if (boss) updateBoss(dt);
     updateGates(dt);
     updateItems(dt);
     updateParticles(dt);
@@ -261,18 +272,35 @@
   }
 
   // ---------- 적: 지평선에서 등장 → 접근 ----------
+  // 종류: normal(기본) / fast(빠름) / tank(탱키) / splitter(분열) / shell(얼음껍질) / ranged(원거리)
   function spawnEnemy() {
-    const hp = 2 + Math.floor(elapsed / 14);
-    const big = Math.random() < 0.16 + elapsed * 0.002;
-    enemies.push({
-      lane: -0.9 + Math.random() * 1.8,
-      p: 0.0,
-      vp: 0.10 + Math.random() * 0.05 + elapsed * 0.0016,
-      hp: big ? hp * 2 : hp, maxHp: big ? hp * 2 : hp,
-      r: big ? 22 : 15, big: big,
-      sway: Math.random() * 6.28, swaySpd: 1.5 + Math.random() * 1.5,
-      hit: 0,
-    });
+    const baseHp = 2 + Math.floor(elapsed / 14);
+    const t = Math.min(1, elapsed / 60);   // 시간이 지날수록 특수 적 비중 ↑
+    const r = Math.random();
+    let kind = "normal";
+    if (r < 0.16 + t * 0.10) kind = "fast";
+    else if (r < 0.30 + t * 0.12) kind = "tank";
+    else if (r < 0.42 + t * 0.10) kind = "splitter";
+    else if (r < 0.52 + t * 0.10) kind = "shell";
+    else if (r < 0.60 + t * 0.08) kind = "ranged";
+    enemies.push(makeEnemy(kind, baseHp, -0.9 + Math.random() * 1.8, 0));
+  }
+
+  function makeEnemy(kind, baseHp, lane, p) {
+    const e = { kind: kind, lane: lane, p: p, hit: 0,
+                sway: Math.random() * 6.28, swaySpd: 1.5 + Math.random() * 1.5 };
+    const acc = elapsed * 0.0014;
+    switch (kind) {
+      case "fast":  e.r = 12; e.hp = Math.max(1, baseHp - 1); e.vp = 0.22 + Math.random() * 0.05 + acc; break;
+      case "tank":  e.r = 25; e.hp = baseHp * 3;              e.vp = 0.065 + Math.random() * 0.02 + acc * 0.6; break;
+      case "splitter": e.r = 18; e.hp = Math.ceil(baseHp * 1.4); e.vp = 0.10 + Math.random() * 0.03 + acc; break;
+      case "shell": e.r = 17; e.hp = baseHp; e.shell = baseHp + 3; e.vp = 0.085 + Math.random() * 0.03 + acc; break;
+      case "ranged": e.r = 15; e.hp = baseHp; e.vp = 0.06 + Math.random() * 0.02 + acc * 0.6; e.shootTimer = 1.4 + Math.random(); break;
+      case "shard": e.r = 9;  e.hp = 1; e.vp = 0.20 + Math.random() * 0.06 + acc; break;
+      default:      e.r = 15; e.hp = baseHp; e.vp = 0.10 + Math.random() * 0.05 + acc;
+    }
+    e.maxHp = e.hp; e.shellMax = e.shell || 0; e.big = (kind === "tank");
+    return e;
   }
 
   function updateBullets(dt) {
@@ -313,6 +341,21 @@
       }
       if (hit) { bullets.splice(i, 1); continue; }
 
+      // 보스 충돌
+      if (boss) {
+        const bs = projScale(boss.p);
+        const bxx = laneToX(boss.p, boss.lane), byy = projY(boss.p) - boss.r * bs * 0.6;
+        const rad = boss.r * bs + 6 * projScale(b.p);
+        const dx = bx - bxx, dy = by - byy;
+        if (dx * dx + dy * dy <= rad * rad) {
+          boss.hp -= b.dmg; boss.hit = 0.1;
+          spawnParticles(bx, by, "#ffd0d0", 4, 130);
+          if (boss.hp <= 0) killBoss();
+          bullets.splice(i, 1);
+          continue;
+        }
+      }
+
       // 적 충돌(원근 화면좌표 기준)
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j];
@@ -321,10 +364,19 @@
         const rad = e.r * es + 6 * projScale(b.p);
         const dx = bx - ex, dy = by - ey;
         if (dx * dx + dy * dy <= rad * rad) {
-          e.hp -= b.dmg;
-          e.hit = 0.12;
-          spawnParticles(bx, by, "#dff3ff", 4, 120);
-          if (e.hp <= 0) killEnemy(j);
+          if (e.shell > 0) {
+            // 얼음 껍질 먼저 깨야 함
+            e.shell -= b.dmg; e.hit = 0.12;
+            spawnParticles(bx, by, "#cfeaff", 5, 140);
+            if (e.shell <= 0) {
+              spawnParticles(ex, ey, "#ffffff", 10, 200);
+              spawnText(ex, ey - e.r * es, "껍질 깨짐!", "#cfeaff", 12);
+            }
+          } else {
+            e.hp -= b.dmg; e.hit = 0.12;
+            spawnParticles(bx, by, "#dff3ff", 4, 120);
+            if (e.hp <= 0) killEnemy(j);
+          }
           bullets.splice(i, 1);
           break;
         }
@@ -337,10 +389,17 @@
     const ex = laneToX(e.p, e.lane), ey = projY(e.p);
     spawnParticles(ex, ey, "#bfe6ff", e.big ? 18 : 10, 160);
     spawnParticles(ex, ey, "#ffffff", e.big ? 10 : 5, 200);
-    const pts = e.big ? 25 : 10;
+    const pts = e.kind === "tank" ? 30 : (e.kind === "shard" ? 5 : 10);
     score += pts;
     spawnText(ex, ey - e.r * projScale(e.p), "+" + pts, "#eaffd0", e.big ? 16 : 13);
     enemies.splice(j, 1);
+
+    // 분열형: 죽으면 작은 파편 2마리로 쪼개짐
+    if (e.kind === "splitter") {
+      const baseHp = 1;
+      enemies.push(makeEnemy("shard", baseHp, Math.max(-0.95, e.lane - 0.18), e.p));
+      enemies.push(makeEnemy("shard", baseHp, Math.min(0.95, e.lane + 0.18), e.p));
+    }
   }
 
   function updateEnemies(dt) {
@@ -350,6 +409,16 @@
       e.p += e.vp * (0.45 + e.p * 1.1) * dt;
       e.sway += dt * e.swaySpd;
       if (e.hit > 0) e.hit -= dt;
+
+      // 원거리형: 멀리서 눈덩이를 던진다
+      if (e.kind === "ranged") {
+        e.shootTimer -= dt;
+        if (e.shootTimer <= 0 && e.p > 0.2 && e.p < 0.8) {
+          e.shootTimer = 2.2;
+          spawnEnemyShot(e.lane, e.p);
+        }
+      }
+
       if (e.p >= 1) {
         const bx = laneToX(1, e.lane);
         if (player.shield > 0) {
@@ -368,6 +437,87 @@
         if (player.squad <= 0) { player.squad = 0; updateHUD(); gameOver(); return; }
       }
     }
+  }
+
+  // ---------- 적 발사체(원거리/보스) ----------
+  function spawnEnemyShot(lane, p) {
+    eBullets.push({ lane: lane, p: p, vp: 0.42, r: 7 });
+  }
+  function updateEBullets(dt) {
+    for (let i = eBullets.length - 1; i >= 0; i--) {
+      const b = eBullets[i];
+      b.p += b.vp * (0.5 + b.p * 0.9) * dt;
+      if (b.p >= 1) {
+        const bx = laneToX(1, b.lane);
+        if (player.shield > 0) {
+          player.shield--;
+          spawnText(bx, playerLineY() - 22, "🛡 -1", "#7fd0ff", 18);
+        } else {
+          player.squad--;
+          spawnText(bx, playerLineY() - 22, "-1 🐧", "#ff6b6b", 22);
+          screenFlash = 0.3;
+        }
+        spawnParticles(bx, playerLineY(), "#9ab8d0", 12, 200);
+        lineFlash = 0.45; shake = Math.min(16, shake + 9);
+        eBullets.splice(i, 1);
+        if (player.squad <= 0) { player.squad = 0; updateHUD(); gameOver(); return; }
+      }
+    }
+  }
+
+  // ---------- 보스 ----------
+  function spawnBoss() {
+    const hp = 60 + elapsed * 2.2;
+    boss = {
+      lane: 0, p: 0.0, vp: 0.028,
+      hp: hp, maxHp: hp, r: 42, hit: 0,
+      sway: 0, shootTimer: 2.2, bounce: 0,
+    };
+    showToast("❄ 빙하의 군주 등장! 집중 사격!", true);
+    shake = Math.min(20, shake + 14);
+    screenFlash = 0.25;
+  }
+  function updateBoss(dt) {
+    boss.p += boss.vp * (0.6 + boss.p * 0.5) * dt;
+    boss.sway += dt * 1.2;
+    boss.lane = Math.sin(boss.sway) * 0.5;
+    if (boss.hit > 0) boss.hit -= dt;
+
+    boss.shootTimer -= dt;
+    if (boss.shootTimer <= 0 && boss.p > 0.15) {
+      boss.shootTimer = Math.max(0.7, 1.8 - elapsed * 0.004);
+      // 부채꼴로 3발
+      spawnEnemyShot(boss.lane - 0.3, boss.p);
+      spawnEnemyShot(boss.lane, boss.p);
+      spawnEnemyShot(boss.lane + 0.3, boss.p);
+    }
+
+    if (boss.p >= 1) {
+      // 방어선 도달 → 큰 피해 후 뒤로 물러남
+      const dmg = Math.min(player.squad, 2);
+      player.squad -= dmg;
+      spawnText(laneToX(1, boss.lane), playerLineY() - 26, "-" + dmg + " 🐧", "#ff5a5a", 26);
+      spawnParticles(laneToX(1, boss.lane), playerLineY(), "#ff8a8a", 24, 260);
+      lineFlash = 0.6; screenFlash = 0.45; shake = Math.min(22, shake + 16);
+      boss.p = 0.55;
+      updateHUD();
+      if (player.squad <= 0) { player.squad = 0; updateHUD(); gameOver(); }
+    }
+  }
+  function killBoss() {
+    const bx = laneToX(boss.p, boss.lane), by = projY(boss.p);
+    spawnParticles(bx, by, "#bfe6ff", 50, 320);
+    spawnParticles(bx, by, "#ffffff", 30, 360);
+    score += 1500;
+    spawnText(bx, by, "보스 처치! +1500", "#ffe678", 26);
+    // 화면 정리 + 보상
+    enemies.length = 0; eBullets.length = 0;
+    spawnItem(player.x, playerLineY() - 50);
+    spawnItem(player.x - 40, playerLineY() - 50);
+    shake = Math.min(24, shake + 18); screenFlash = 0.5;
+    boss = null;
+    bossNextAt = elapsed + 40;
+    updateHUD();
   }
 
   function updateGates(dt) {
@@ -522,7 +672,9 @@
     if (state === STATE.PLAY || state === STATE.OVER) {
       drawGates();
       drawEnemies();
+      if (boss) drawBoss();
       drawBullets();
+      drawEBullets();
       drawParticles();
       drawItems();
       drawPlayer();
@@ -541,6 +693,24 @@
     if (screenFlash > 0) {
       ctx.fillStyle = "rgba(255, 40, 40, " + (screenFlash * 0.5) + ")";
       ctx.fillRect(0, 0, W, H);
+    }
+
+    // 보스 상단 배너 + HP바
+    if (state === STATE.PLAY && boss) {
+      const m = 40, y = 44, bw = W - m * 2, bh = 12;
+      ctx.fillStyle = "rgba(10,24,40,0.65)";
+      ctx.fillRect(m - 4, y - 16, bw + 8, bh + 22);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#cfe8ff";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("❄ 빙하의 군주", W / 2, y - 4);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(m, y, bw, bh);
+      ctx.fillStyle = "#ff5a6a";
+      ctx.fillRect(m, y, bw * Math.max(0, boss.hp / boss.maxHp), bh);
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1.5;
+      ctx.strokeRect(m, y, bw, bh);
+      ctx.textAlign = "start";
     }
     // 펭귄이 적을 때 위험 비네팅 + 경고
     if (state === STATE.PLAY && player && player.squad <= 2) {
@@ -761,6 +931,17 @@
     ctx.restore();
   }
 
+  // 적 종류별 몸 색(밝은쪽, 어두운쪽)
+  const ENEMY_COLORS = {
+    normal:   ["#bfe3ff", "#5fa3d8"],
+    fast:     ["#d0fff4", "#3fc6ad"],
+    tank:     ["#b9c8ff", "#4a63b8"],
+    splitter: ["#ecccff", "#9a5fd8"],
+    shell:    ["#bfe3ff", "#5fa3d8"],
+    ranged:   ["#ffe0c0", "#d88f4a"],
+    shard:    ["#ecccff", "#9a5fd8"],
+  };
+
   // ---------- 얼음 몬스터 ----------
   function drawEnemies() {
     // 먼 것부터 그려 가까운 게 위에 오도록
@@ -778,9 +959,10 @@
       ctx.fillStyle = "rgba(40,80,120,0.18)";
       ctx.beginPath(); ctx.ellipse(0, r * 0.9, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
 
+      const c = ENEMY_COLORS[e.kind] || ENEMY_COLORS.normal;
       const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 2, 0, 0, r);
       if (e.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#cfe9ff"); }
-      else { grad.addColorStop(0, "#bfe3ff"); grad.addColorStop(1, "#5fa3d8"); }
+      else { grad.addColorStop(0, c[0]); grad.addColorStop(1, c[1]); }
       ctx.fillStyle = grad;
       ctx.strokeStyle = "rgba(30,70,110,0.5)";
       ctx.lineWidth = 1.5;
@@ -812,6 +994,20 @@
       ctx.moveTo(-r * 0.3, r * 0.35); ctx.lineTo(-r * 0.15, r * 0.7); ctx.lineTo(0, r * 0.35);
       ctx.lineTo(r * 0.15, r * 0.7); ctx.lineTo(r * 0.3, r * 0.35);
       ctx.closePath(); ctx.fill();
+
+      // 원거리형: 머리 위 발사 노즐
+      if (e.kind === "ranged") {
+        ctx.fillStyle = "#8a5a2a";
+        ctx.fillRect(-r * 0.18, -r * 1.35, r * 0.36, r * 0.55);
+      }
+      // 얼음 껍질(안 깨진 동안)
+      if (e.shell > 0) {
+        ctx.strokeStyle = "rgba(225,248,255,0.95)";
+        ctx.fillStyle = "rgba(205,238,255,0.28)";
+        ctx.lineWidth = Math.max(1.5, 2.5 * sc);
+        ctx.beginPath(); ctx.arc(0, 0, r * 1.28, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
       ctx.restore();
 
       // 체력바
@@ -841,6 +1037,85 @@
       ctx.fillStyle = "#ffffff";
       ctx.beginPath(); ctx.arc(bx, by, rr, 0, Math.PI * 2); ctx.fill();
     }
+  }
+
+  // ---------- 적 발사체 ----------
+  function drawEBullets() {
+    for (const b of eBullets) {
+      const sc = projScale(b.p);
+      const bx = laneToX(b.p, b.lane), by = projY(b.p);
+      const rr = b.r * sc + 1;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, rr * 2.2);
+      g.addColorStop(0, "rgba(160,200,235,0.85)");
+      g.addColorStop(1, "rgba(120,160,210,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(bx, by, rr * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#cfe0ee";
+      ctx.beginPath(); ctx.arc(bx, by, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(40,70,100,0.6)"; ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // ---------- 보스: 빙하의 군주 ----------
+  function drawBoss() {
+    const sc = projScale(boss.p);
+    const r = boss.r * sc;
+    const bx = laneToX(boss.p, boss.lane);
+    const by = projY(boss.p) - r * 0.6;
+
+    // 그림자
+    ctx.fillStyle = "rgba(20,50,80,0.25)";
+    ctx.beginPath(); ctx.ellipse(bx, by + r * 0.95, r, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 몸체(큰 얼음 결정)
+    ctx.save();
+    ctx.translate(bx, by);
+    const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.4, 4, 0, 0, r);
+    if (boss.hit > 0) { grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "#bcdcff"); }
+    else { grad.addColorStop(0, "#dff0ff"); grad.addColorStop(0.6, "#7fb6e8"); grad.addColorStop(1, "#3a6bb0"); }
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = "rgba(20,50,90,0.6)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const spikes = 12;
+    for (let i = 0; i <= spikes; i++) {
+      const a = (i / spikes) * Math.PI * 2;
+      const rr = r * (i % 2 ? 0.82 : 1.08);
+      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    // 왕관
+    ctx.fillStyle = "#ffd24a";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.55, -r * 0.9); ctx.lineTo(-r * 0.3, -r * 1.25);
+    ctx.lineTo(-r * 0.05, -r * 0.95); ctx.lineTo(r * 0.2, -r * 1.3);
+    ctx.lineTo(r * 0.45, -r * 0.92); ctx.lineTo(r * 0.55, -r * 0.78);
+    ctx.lineTo(-r * 0.55, -r * 0.78); ctx.closePath(); ctx.fill();
+
+    // 눈
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(-r * 0.34, -r * 0.1, r * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.34, -r * 0.1, r * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#d01e2e";
+    ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.38, -r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // 머리 위 떠있는 HP바
+    const bw = r * 2.2, bh = 6 * sc + 2;
+    const bxx = bx - bw / 2, byy = by - r * 1.5;
+    ctx.fillStyle = "rgba(10,30,50,0.6)";
+    ctx.fillRect(bxx, byy, bw, bh);
+    ctx.fillStyle = "#ff5a6a";
+    ctx.fillRect(bxx, byy, bw * Math.max(0, boss.hp / boss.maxHp), bh);
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1;
+    ctx.strokeRect(bxx, byy, bw, bh);
   }
 
   function drawFlashes() {
