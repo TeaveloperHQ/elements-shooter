@@ -68,7 +68,6 @@
   }
   function laneToX(p, lane) { return curveCenterX(p) + lane * halfAt(p); }
 
-  const HOLE_HALF = 0.42;   // 구덩이 반폭(길 반폭 대비) — 최대 너비 ≈ 길의 절반
 
   // ===================== 상태 =====================
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
@@ -79,6 +78,7 @@
   let spawnTimer, elapsed, speed, scrollY, shake, screenFlash;
   let curveT = 0;
   let decorTimer = 0;
+  let stored = [];          // 상단에 모은 정어리 통조림
   let snow = [], bergs = [], scenery = [];
 
   // ===================== 메타(영구 저장) =====================
@@ -119,7 +119,7 @@
       lives: 3 + META.up.life,
       stun: 0,
     };
-    items = []; particles = []; texts = []; scenery = [];
+    items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
     spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3;
     updateHUD();
@@ -201,18 +201,29 @@
   }
 
   // ===================== 스폰 =====================
+  // 크레바스: 매번 다른 들쭉날쭉한 외곽선
+  function makeJagged() {
+    const n = 14 + ((Math.random() * 6) | 0);
+    const arr = [];
+    for (let i = 0; i < n; i++) arr.push(0.58 + Math.random() * 0.55);
+    return arr;
+  }
   function spawnObstacle() {
     const r = Math.random();
-    if (r < 0.42) {
-      // 얼음 구덩이
-      const lane = (-1 + ((Math.random() * 3) | 0)) * 0.5;   // -0.5 / 0 / 0.5
-      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10 + Math.random() * 0.02, done: false });
+    if (r < 0.35) {
+      // 얼음 크레바스 — 크기 1/3 ~ 2/3, 랜덤 갈라진 모양
+      const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;   // -0.4 / 0 / 0.4
+      const w = (1 / 3) + Math.random() * (1 / 3);
+      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10 + Math.random() * 0.02, done: false, w: w, shape: makeJagged() });
+    } else if (r < 0.86) {
+      // 정어리 통조림 (겉면에 원소 기호)
+      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      items.push({ type: "can", el: el, lane: -0.75 + Math.random() * 1.5,
+        p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
     } else {
-      // 원소 깃발 (안전 65% / 위험 35%)
-      const safe = Math.random() < 0.65;
-      const pool = safe ? BUFF_ELEMENTS : TRAP_ELEMENTS;
-      const el = pool[(Math.random() * pool.length) | 0];
-      items.push({ type: "flag", el: el, safe: safe, lane: -0.75 + Math.random() * 1.5,
+      // 통조림 따개 (뱃지에 원소 이름 한글)
+      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      items.push({ type: "opener", el: el, lane: -0.7 + Math.random() * 1.4,
         p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
     }
   }
@@ -280,14 +291,14 @@
     for (let i = items.length - 1; i >= 0; i--) {
       const o = items[i];
       o.p += o.vp * (0.5 + o.p * 1.0) * dt;
-      if (o.type === "flag") o.wave += dt * 5;
+      if (o.type === "can" || o.type === "opener") o.wave += dt * 5;
 
-      // 자석: 안전 깃발을 끌어당김
-      if (o.type === "flag" && o.safe && META.up.magnet > 0 && o.p > 0.6 && player.onGround) {
+      // 자석: 통조림/따개를 끌어당김
+      if ((o.type === "can" || o.type === "opener") && META.up.magnet > 0 && o.p > 0.6 && player.onGround) {
         const ox = laneToX(o.p, o.lane);
         const range = 30 + META.up.magnet * 16;
         if (Math.abs(player.x - ox) < range) {
-          o.lane += (((player.x - W / 2) / halfAt(o.p)) - o.lane) * Math.min(1, dt * 4);
+          o.lane += (((player.x - curveCenterX(o.p)) / halfAt(o.p)) - o.lane) * Math.min(1, dt * 4);
         }
       }
 
@@ -295,14 +306,15 @@
         o.done = true;
         const ox = laneToX(1, o.lane);
         if (o.type === "hole") hitHole(o, ox, AIR);
-        else hitFlag(o, ox, AIR);
+        else if (o.type === "can") collectCan(o, ox, AIR);
+        else eatOpener(o, ox, AIR);
       }
       if (o.p > 1.1) items.splice(i, 1);
     }
   }
 
   function hitHole(o, ox, AIR) {
-    const holeHalf = halfAt(1) * HOLE_HALF;
+    const holeHalf = halfAt(1) * o.w;
     if (player.jumpY > AIR) {
       // 점프로 넘음
       score += 5; runCoins += 1;
@@ -316,31 +328,56 @@
     // 옆으로 비켜서 있으면 무사
   }
 
-  function hitFlag(o, ox, AIR) {
+  // 정어리 통조림: 주우면 상단 보관함에 쌓인다
+  function collectCan(o, ox, AIR) {
     const el = o.el;
-    const grounded = player.jumpY <= AIR;
-    if (o.safe) {
-      // 안전 원소: 가까이서 주우면 획득 + 학습
-      const catchR = 36 + META.up.magnet * 8;
-      if (grounded && Math.abs(player.x - ox) < catchR) {
-        learned[el.symbol] = true;
-        score += 100; runCoins += 2;
-        spawnParticles(ox, playerLineY() - 20, el.color, 14, 170);
-        spawnText(player.x, playerLineY() - 60, "+100 " + el.symbol, "#ffe678", 20);
-        SND.flag();
-        showToast(el.symbol + " " + el.name + " — " + el.fact, false);
-        updateHUD();
-      }
-    } else {
-      // 위험 원소: 부딪히면 목숨↓ + 경고. 피하면 안전(학습은 됨)
-      const hitR = 30;
-      if (grounded && Math.abs(player.x - ox) < hitR) {
-        learned[el.symbol] = true;
-        loseLife("⚠ " + el.symbol + " " + el.name + "!");
-        showToast("⚠ " + el.symbol + " " + el.name + " — " + el.fact, true);
-        spawnParticles(ox, playerLineY(), "#e08080", 16, 220);
-      }
+    const catchR = 36 + META.up.magnet * 8;
+    if (player.jumpY <= AIR && Math.abs(player.x - ox) < catchR) {
+      learned[el.symbol] = true;
+      stored.push({ symbol: el.symbol, name: el.name, color: el.color });
+      score += 30; runCoins += 1;
+      spawnParticles(ox, playerLineY() - 20, el.color, 10, 150);
+      spawnText(player.x, playerLineY() - 56, "🥫 " + el.symbol, "#cfe6ff", 18);
+      SND.flag();
+      showToast(el.symbol + " " + el.name + " 통조림 획득! (위에 모임)", false);
+      updateHUD();
     }
+  }
+
+  // 통조림 따개: 먹으면 쌓인 통조림이 열려 정어리가 나온다. 통조림 없으면 의미 없음.
+  function eatOpener(o, ox, AIR) {
+    const catchR = 34 + META.up.magnet * 6;
+    if (player.jumpY <= AIR && Math.abs(player.x - ox) < catchR) {
+      learned[o.el.symbol] = true;
+      if (stored.length === 0) {
+        spawnText(player.x, playerLineY() - 56, "통조림이 없어요!", "#ffcf9a", 16);
+        SND.bad();
+        showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
+        return;
+      }
+      const cnt = stored.length;
+      const gain = cnt * 120;
+      score += gain; runCoins += cnt;
+      openStored();
+      spawnText(player.x, playerLineY() - 62, "통조림 OPEN! +" + gain, "#ffe678", 22);
+      SND.base();
+      showToast("🥫 통조림 " + cnt + "개 개봉! 🐟 정어리 " + cnt + "마리! +" + gain, false);
+      updateHUD();
+    }
+  }
+
+  // 상단 통조림을 개봉 — 정어리가 쏟아지고 보관함 비움
+  function openStored() {
+    const n = Math.min(stored.length, 9);
+    const cw = 26, gap = 5, totalW = n * (cw + gap) - gap;
+    const sx = W / 2 - totalW / 2, y = 64;
+    for (let i = 0; i < n; i++) {
+      const x = sx + i * (cw + gap) + cw / 2;
+      spawnText(x, y, "🐟", "#bcd6e8", 20);
+      spawnParticles(x, y, "#cfe6f5", 8, 170);
+    }
+    shake = Math.min(14, shake + 8);
+    stored = [];
   }
 
   function loseLife(msg) {
@@ -414,6 +451,7 @@
 
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
+    if (state === STATE.PLAY || state === STATE.OVER) drawStored();
     if (state === STATE.PLAY && player.lives <= 1) {
       const pulse = 0.18 + (Math.sin(elapsed * 6) * 0.5 + 0.5) * 0.16;
       const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.72);
@@ -585,22 +623,34 @@
   // ---------- 아이템(구덩이/깃발) ----------
   function drawItems() {
     const sorted = items.slice().sort(function (a, b) { return a.p - b.p; });
-    for (const o of sorted) { if (o.type === "hole") drawHole(o); else drawFlag(o); }
+    for (const o of sorted) {
+      if (o.type === "hole") drawHole(o);
+      else if (o.type === "can") drawCan(o);
+      else drawOpener(o);
+    }
   }
 
   function drawHole(o) {
     const sc = projScale(o.p), y = projY(o.p);
     const cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * HOLE_HALF, ry = rx * 0.26;   // 납작하게(점프 타이밍 읽기 쉽게)
+    const rx = halfAt(o.p) * o.w, ry = rx * 0.22;   // 넓고 납작
+    const shp = o.shape, n = shp.length;
+    function outline() {
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const a = (i % n) / n * Math.PI * 2, rr = shp[i % n];
+        const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
     ctx.save();
     const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
     g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(180,225,245,0.35)"; ctx.beginPath(); ctx.ellipse(cx - rx * 0.25, y - ry * 0.25, rx * 0.35, ry * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.5 * sc);
-    ctx.beginPath(); ctx.ellipse(cx, y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = "rgba(230,247,255,0.95)";
-    for (let k = -2; k <= 2; k++) { const px = cx + k * rx * 0.4; ctx.beginPath(); ctx.moveTo(px - 3 * sc, y - ry); ctx.lineTo(px, y - ry - 5 * sc); ctx.lineTo(px + 3 * sc, y - ry); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = g; outline(); ctx.fill();
+    ctx.fillStyle = "rgba(180,225,245,0.3)"; ctx.beginPath(); ctx.ellipse(cx - rx * 0.3, y - ry * 0.3, rx * 0.3, ry * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
+    outline(); ctx.stroke();
     ctx.restore();
     // 점프 안내
     ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
@@ -608,39 +658,77 @@
     ctx.textAlign = "start"; ctx.restore();
   }
 
-  function drawFlag(o) {
+  // 정어리 통조림(원소 기호)
+  function drawCan(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
-    const poleH = 46 * sc, topY = gy - poleH;
-    const fw = 30 * sc, fh = 22 * sc;
-    const wav = Math.sin(o.wave) * 2 * sc;
+    const cw = 24 * sc, ch = 17 * sc;
+    const top = gy - ch - (3 + Math.sin(o.wave) * 2) * sc;
+    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, cw * 0.5, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
+    // 몸통(은색)
+    const g = ctx.createLinearGradient(x - cw / 2, 0, x + cw / 2, 0);
+    g.addColorStop(0, "#8fa3b5"); g.addColorStop(0.5, "#f0f6fb"); g.addColorStop(1, "#8fa3b5");
+    ctx.fillStyle = g; ctx.fillRect(x - cw / 2, top, cw, ch);
+    // 라벨 밴드 + 원소 기호
+    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.5);
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (ch * 0.42) + "px sans-serif";
+    ctx.fillText(o.el.symbol, x, top + ch * 0.62);
+    // 뚜껑(타원) + 림
+    ctx.fillStyle = "#e3edf5"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.beginPath(); ctx.ellipse(x, top, cw / 2, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ch, cw / 2, 3 * sc, 0, 0, Math.PI); ctx.stroke();
+    ctx.textAlign = "start";
+  }
 
-    // 그림자 + 막대
-    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 7 * sc, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#caa46a"; ctx.lineWidth = Math.max(2, 3 * sc); ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, topY); ctx.stroke();
-    ctx.fillStyle = "#e8c349"; ctx.beginPath(); ctx.arc(x, topY, Math.max(2, 2.5 * sc), 0, Math.PI * 2); ctx.fill();
-
-    // 깃발(나부낌)
-    ctx.beginPath();
-    ctx.moveTo(x, topY);
-    ctx.lineTo(x + fw, topY + wav);
-    ctx.lineTo(x + fw, topY + fh + wav);
-    ctx.lineTo(x, topY + fh);
-    ctx.closePath();
-    ctx.fillStyle = o.safe ? "#2f8fe0" : "#d8444f";
-    ctx.fill();
-    ctx.strokeStyle = o.safe ? "rgba(190,232,255,0.9)" : "rgba(255,190,190,0.9)";
-    ctx.lineWidth = Math.max(1, 1.5 * sc); ctx.stroke();
-
-    // 원소 기호
-    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
-    ctx.font = "bold " + (fh * 0.7) + "px sans-serif";
-    ctx.fillText(o.el.symbol, x + fw * 0.52, topY + fh * 0.72 + wav * 0.5);
-    if (!o.safe) {
-      ctx.fillStyle = "#ffe1e1"; ctx.font = "bold " + (8 * sc + 5) + "px sans-serif";
-      ctx.fillText("⚠", x + fw * 0.52, topY - 3 * sc);
+  // 통조림 따개(원소 이름 한글)
+  function drawOpener(o) {
+    const sc = projScale(o.p);
+    const x = laneToX(o.p, o.lane), gy = projY(o.p);
+    const w = 38 * sc, h = 18 * sc;
+    const cy = gy - 26 * sc - h + Math.sin(o.wave) * 2 * sc;
+    // 그림자 + 받침대
+    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 8 * sc, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#9aa6b2"; ctx.lineWidth = Math.max(1.5, 2 * sc); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, cy + h); ctx.stroke();
+    // 금속 톱니 날(위)
+    ctx.fillStyle = "#cfd8e3"; ctx.strokeStyle = "rgba(80,110,140,0.6)"; ctx.lineWidth = Math.max(1, sc);
+    for (let k = -1; k <= 1; k++) {
+      const px = x + k * w * 0.2;
+      ctx.beginPath(); ctx.moveTo(px - 3 * sc, cy); ctx.lineTo(px, cy - 6 * sc); ctx.lineTo(px + 3 * sc, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+    // 손잡이(빨강) + 한글 원소 이름
+    ctx.fillStyle = "#d8444f"; ctx.strokeStyle = "rgba(255,200,200,0.85)"; ctx.lineWidth = Math.max(1, 1.5 * sc);
+    ctx.fillRect(x - w / 2, cy, w, h); ctx.strokeRect(x - w / 2, cy, w, h);
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (h * 0.5) + "px sans-serif";
+    ctx.fillText(o.el.name, x, cy + h * 0.68);
+    // "따개" 라벨
+    ctx.fillStyle = "#ffd7da"; ctx.font = "bold " + (7 * sc + 4) + "px sans-serif";
+    ctx.fillText("🔧 따개", x, cy - 8 * sc);
+    ctx.textAlign = "start";
+  }
+
+  // 상단 통조림 보관함
+  function drawStored() {
+    if (!stored.length) return;
+    const n = Math.min(stored.length, 9);
+    const cw = 24, gap = 5, totalW = n * (cw + gap) - gap;
+    const sx = W / 2 - totalW / 2, y = 50;
+    ctx.fillStyle = "rgba(10,24,40,0.4)";
+    ctx.fillRect(sx - 8, y - 4, totalW + (stored.length > n ? 40 : 16), 30);
+    for (let i = 0; i < n; i++) drawMiniCan(sx + i * (cw + gap) + cw / 2, y + 13, stored[i]);
+    if (stored.length > n) {
+      ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "left"; ctx.font = "bold 12px sans-serif";
+      ctx.fillText("+" + (stored.length - n), sx + totalW + 8, y + 18); ctx.textAlign = "start";
+    }
+  }
+  function drawMiniCan(cx, cy, c) {
+    const w = 20, h = 16;
+    const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+    g.addColorStop(0, "#8fa3b5"); g.addColorStop(0.5, "#f0f6fb"); g.addColorStop(1, "#8fa3b5");
+    ctx.fillStyle = g; ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+    ctx.fillStyle = "#e3edf5"; ctx.beginPath(); ctx.ellipse(cx, cy - h / 2, w / 2, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(cx - w / 2, cy - 4, w, 9);
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 9px sans-serif"; ctx.fillText(c.symbol, cx, cy + 3.5);
     ctx.textAlign = "start";
   }
 
