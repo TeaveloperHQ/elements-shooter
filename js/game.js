@@ -98,7 +98,7 @@
     { key: "taj",       name: "인도",      icon: "🕌", tint: "rgba(255,150,110,0.20)" },
     { key: "northpole", name: "북극",      icon: "❄️", tint: "rgba(150,210,255,0.16)" },
   ];
-  function stageIndex() { return Math.min(STAGES.length - 1, Math.floor(distance / STAGE_LEN)); }
+  function stageIndex() { return Math.min(STAGES.length - 1, Math.max(0, Math.floor((distance || 0) / STAGE_LEN))); }
   function stageLandmark() { return STAGES[stageIndex()]; }
   let snow = [], bergs = [], scenery = [], stars = [], iceFx = [];
   let galleryMode = false;
