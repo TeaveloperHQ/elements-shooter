@@ -81,6 +81,7 @@
   let lastStage = 0;        // 스테이지(약 4000거리마다 명물이 바뀜)
   let lastCanyonStage = -1; // 거대 협곡을 스폰한 스테이지(끝자락에 1번)
   let bannerT = 0, bannerText = "", bannerStage = 0;   // 스테이지 도착 배너
+  let supplyStage = -1, supply = [];                    // 협곡 전 보급
   let stored = [];          // 상단에 모은 정어리 통조림
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
@@ -131,7 +132,7 @@
   function upgradeCost(kind) { return UP_BASE[kind] * (META.up[kind] + 1); }
 
   // ===================== 새 게임 =====================
-  const MAX_ENERGY = 100, HOP_COST = 12, FLY_DRAIN = 24, HUNGER = 2.5;
+  const MAX_ENERGY = 100, HOP_COST = 12, FLY_DRAIN = 18, HUNGER = 2.5;
   function newGame() {
     player = {
       x: W / 2, targetX: W / 2, y: 0,
@@ -146,7 +147,7 @@
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1; bannerT = 0;
+    spawnTimer = 1.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1; bannerT = 0; supplyStage = -1; supply = [];
     updateHUD();
   }
 
@@ -270,6 +271,15 @@
       w: 1.0, len: 0.26 + Math.random() * 0.08, shape: makeJagged() });
     showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
   }
+  // 협곡 전 보급 아이템(중앙 근처에 배치해 줍기 쉽게)
+  function spawnSupply(kind) {
+    if (kind === "can") {
+      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      items.push({ type: "can", el: el, lane: -0.3 + Math.random() * 0.6, p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
+    } else {
+      items.push({ type: "opener", lane: -0.25 + Math.random() * 0.5, p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
+    }
+  }
 
   // 길가 풍경(장식, 충돌 없음) — 명물 얼음조각 + 소품
   function spawnScenery() {
@@ -341,9 +351,19 @@
         SND.base();
       }
     }
-    // 스테이지 끝자락(약 88%)에 거대 협곡 1번 — 날아서 건너야 함
     const inStage = distance - st * STAGE_LEN;
-    if (lastCanyonStage !== st && inStage > STAGE_LEN * 0.88) {
+    // 협곡 직전 보급: 통조림 2 + 따개 2를 순서대로 흘려보내 연료 모을 기회 보장
+    if (supplyStage !== st && inStage > STAGE_LEN * 0.6) {
+      supplyStage = st;
+      supply.push({ t: 0.0, kind: "can" }, { t: 1.0, kind: "can" },
+                   { t: 2.6, kind: "opener" }, { t: 3.9, kind: "opener" });
+    }
+    for (let i = supply.length - 1; i >= 0; i--) {
+      supply[i].t -= dt;
+      if (supply[i].t <= 0) { spawnSupply(supply[i].kind); supply.splice(i, 1); }
+    }
+    // 거대 협곡: 끝자락 + 에너지가 충분할 때만(못 건너는 협곡은 안 나옴)
+    if (lastCanyonStage !== st && inStage > STAGE_LEN * 0.9 && player.energy >= 40) {
       lastCanyonStage = st;
       spawnCanyon();
     }
