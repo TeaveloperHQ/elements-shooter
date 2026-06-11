@@ -282,6 +282,9 @@
     player.y = playerLineY();
     player.run += dt * (5 + speed * 0.02);
 
+    // 점프력은 통조림 개봉으로 오르고, 안 쓰면 서서히 내려간다(증가↔감소)
+    if (player.jumpV > player.baseJumpV) player.jumpV = Math.max(player.baseJumpV, player.jumpV - 5 * dt);
+
     // 점프 물리 (점프력이 오르면 하강 시 활공 → 더 오래 난다)
     const flying = player.jumpV > player.baseJumpV + 1;
     if (!player.onGround) {
@@ -496,7 +499,30 @@
 
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
-    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); }
+    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawJumpGauge(); }
+  }
+
+  // 점프력 게이지(현재 나는 능력) — 통조림 개봉으로 차오르고 안 쓰면 줄어든다
+  function drawJumpGauge() {
+    if (state !== STATE.PLAY) return;
+    const baseV = player.baseJumpV, maxV = 880;
+    const frac = Math.max(0, Math.min(1, (player.jumpV - baseV) / (maxV - baseV)));
+    const gx = 16, gw = 13, gh = 92, gy = H - 138;
+    ctx.fillStyle = "rgba(10,24,40,0.5)"; ctx.fillRect(gx - 4, gy - 18, gw + 8, gh + 34);
+    ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(gx, gy, gw, gh);
+    const fh = gh * frac;
+    if (frac > 0.02) {
+      const grad = ctx.createLinearGradient(0, gy + gh, 0, gy);
+      grad.addColorStop(0, "#6fe0a0"); grad.addColorStop(1, "#aef0c0");
+      ctx.fillStyle = grad; ctx.fillRect(gx, gy + gh - fh, gw, fh);
+    }
+    ctx.strokeStyle = "rgba(150,200,180,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(gx, gy, gw, gh);
+    ctx.textAlign = "center"; ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText("🪶", gx + gw / 2, gy - 5);
+    ctx.fillStyle = frac > 0.02 ? "#aef0c0" : "rgba(200,220,240,0.5)";
+    ctx.font = "bold 9px sans-serif";
+    ctx.fillText(frac > 0.02 ? "비행" : "걷기", gx + gw / 2, gy + gh + 12);
+    ctx.textAlign = "start";
   }
 
   // 네비게이션: 남극→북극 경로 + 스테이지 노드 + 현재 위치 마커
