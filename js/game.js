@@ -79,6 +79,7 @@
   let curveT = 0;
   let decorTimer = 0;
   let lastStage = 0;        // 스테이지(약 4000거리마다 명물이 바뀜)
+  let lastCanyonStage = -1; // 거대 협곡을 스폰한 스테이지(끝자락에 1번)
   let stored = [];          // 상단에 모은 정어리 통조림
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
@@ -128,7 +129,7 @@
   function upgradeCost(kind) { return UP_BASE[kind] * (META.up[kind] + 1); }
 
   // ===================== 새 게임 =====================
-  const MAX_ENERGY = 100, HOP_COST = 12, FLY_DRAIN = 24, HUNGER = 3;
+  const MAX_ENERGY = 100, HOP_COST = 12, FLY_DRAIN = 24, HUNGER = 2.5;
   function newGame() {
     player = {
       x: W / 2, targetX: W / 2, y: 0,
@@ -136,14 +137,14 @@
       jumpY: 0, vz: 0, onGround: true,
       jumpV: 540 + META.up.jump * 45,      // 점프(hop) 속도(업그레이드로 강화)
       flapT: 0,                            // 날갯짓 위상
-      energy: 45,                          // 에너지/배고픔 — 점프·비행에 필요
+      energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
       stun: 0,
     };
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0;
+    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1;
     updateHUD();
   }
 
@@ -245,17 +246,10 @@
   function spawnObstacle() {
     const r = Math.random();
     if (r < 0.35) {
-      const big = Math.random() < 0.3;
-      if (big) {
-        // 거대 크레바스 — 길을 가로지름. 점프로는 못 넘고, 에너지 모아 날아서 건너야 함
-        items.push({ type: "hole", lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
-          w: 0.95 + Math.random() * 0.2, len: 0.24 + Math.random() * 0.14, shape: makeJagged() });
-      } else {
-        // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능
-        const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
-        items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, cleared: false,
-          w: (1 / 3) + Math.random() * (1 / 3), len: 0.03, shape: makeJagged() });
-      }
+      // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능 (큰 협곡은 스테이지 끝에만)
+      const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
+      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, cleared: false,
+        w: (1 / 3) + Math.random() * (1 / 3), len: 0.03, shape: makeJagged() });
     } else if (r < 0.86) {
       // 정어리 통조림 (겉면에 원소 기호)
       const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
@@ -266,6 +260,13 @@
       items.push({ type: "opener", lane: -0.7 + Math.random() * 1.4,
         p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     }
+  }
+
+  // 거대 협곡(스테이지 끝) — 길을 가로지름. 점프로는 못 넘고 에너지 모아 비행으로 건너야 함
+  function spawnCanyon() {
+    items.push({ type: "hole", lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
+      w: 1.0, len: 0.26 + Math.random() * 0.08, shape: makeJagged() });
+    showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
   }
 
   // 길가 풍경(장식, 충돌 없음) — 명물 얼음조각 + 소품
@@ -335,6 +336,12 @@
         showToast("🗺 스테이지 " + (st + 1) + " — " + s.icon + " " + s.name + " 도착!", false);
         SND.base();
       }
+    }
+    // 스테이지 끝자락(약 88%)에 거대 협곡 1번 — 날아서 건너야 함
+    const inStage = distance - st * STAGE_LEN;
+    if (lastCanyonStage !== st && inStage > STAGE_LEN * 0.88) {
+      lastCanyonStage = st;
+      spawnCanyon();
     }
 
     // 길가 풍경 스폰/이동
@@ -412,7 +419,6 @@
     learned[el.symbol] = true;
     stored.push({ symbol: el.symbol, name: el.name, color: el.color });
     score += 30; runCoins += 1;
-    player.energy = Math.min(MAX_ENERGY, player.energy + 10);   // 살짝 충전
     spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
     spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
     SND.flag();
@@ -444,7 +450,7 @@
     const c = stored.pop();
     learned[c.symbol] = true;
     score += 200; runCoins += 2;
-    player.energy = Math.min(MAX_ENERGY, player.energy + 34);   // 정어리 식사 → 에너지 ↑
+    player.energy = Math.min(MAX_ENERGY, player.energy + 40);   // 정어리 식사 → 에너지 ↑(유일한 충전원)
     spawnText(slotX, 99, "🐟", "#bcd6e8", 22);
     spawnParticles(slotX, 99, "#cfe6f5", 12, 190);
     spawnText(player.x, playerLineY() - 64, c.name + " 냠냠! +200", "#ffe678", 22);
@@ -929,12 +935,45 @@
   }
 
   function drawHole(o) {
+    if (o.len <= 0.1) { drawCrevasse(o); return; }   // 보통: 랜덤 들쭉날쭉
+    drawCanyon(o);                                     // 큰 협곡: 가로지르는 띠
+  }
+
+  // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
+  function drawCrevasse(o) {
+    const sc = projScale(o.p), y = projY(o.p);
+    const cx = laneToX(o.p, o.lane);
+    const rx = halfAt(o.p) * o.w, ry = rx * 0.26;
+    const shp = o.shape, n = shp.length;
+    function outline() {
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const a = (i % n) / n * Math.PI * 2, rr = shp[i % n];
+        const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+    ctx.save();
+    const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
+    g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
+    ctx.fillStyle = g; outline(); ctx.fill();
+    ctx.fillStyle = "rgba(180,225,245,0.3)"; ctx.beginPath(); ctx.ellipse(cx - rx * 0.3, y - ry * 0.3, rx * 0.3, ry * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
+    outline(); ctx.stroke();
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
+    ctx.font = "bold " + (9 * sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", cx, y - ry - 8 * sc);
+    ctx.textAlign = "start"; ctx.restore();
+  }
+
+  // 거대 협곡 — 길을 가로지르는 들쭉날쭉 띠
+  function drawCanyon(o) {
     const fP = o.p, bP = Math.max(0.02, o.p - o.len);
     const fy = projY(fP), by = projY(bP);
     const fcx = laneToX(fP, o.lane), bcx = laneToX(bP, o.lane);
     const frx = halfAt(fP) * o.w, brx = halfAt(bP) * o.w;
     const sc = projScale(fP), shp = o.shape, n = shp.length;
-    const big = o.len > 0.1;
 
     ctx.save();
     // 어두운 얼음 밴드(앞↔뒤 사다리꼴)
@@ -960,11 +999,11 @@
     ctx.stroke();
     ctx.restore();
 
-    // 안내(거대 크레바스는 비행 필요)
+    // 안내(거대 협곡은 비행 필요)
     ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center";
-    ctx.fillStyle = big ? "#ffd07a" : "#cfe6ff";
-    ctx.font = "bold " + (big ? 11 * sc + 6 : 9 * sc + 6) + "px sans-serif";
-    ctx.fillText(big ? "🪽 날아서 건너기!" : "⬆ 점프", fcx, fy - 7 * sc);
+    ctx.fillStyle = "#ffd07a";
+    ctx.font = "bold " + (11 * sc + 6) + "px sans-serif";
+    ctx.fillText("🪽 날아서 건너기!", fcx, fy - 7 * sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
