@@ -53,7 +53,12 @@
   function projY(p) { return horizonY() + (playerLineY() - horizonY()) * p; }
   function projScale(p) { return 0.28 + 1.0 * p; }
   function halfAt(p) { return roadHalfTop() + (roadHalfBot() - roadHalfTop()) * p; }
-  function laneToX(p, lane) { return W / 2 + lane * halfAt(p); }
+  // 굽이치는 트랙: 깊이 p에서 길 중심의 화면 X (멀수록 더 휜다)
+  function curveCenterX(p) {
+    const w = 0.3 + 0.7 * (1 - p);
+    return W / 2 + Math.sin(curveT + (1 - p) * 1.9) * (W * 0.17) * w;
+  }
+  function laneToX(p, lane) { return curveCenterX(p) + lane * halfAt(p); }
 
   const HOLE_HALF = 0.42;   // 구덩이 반폭(길 반폭 대비) — 최대 너비 ≈ 길의 절반
 
@@ -64,6 +69,7 @@
   let player, items, particles, texts;
   let score, distance, learned, runCoins;
   let spawnTimer, elapsed, speed, scrollY, shake, screenFlash;
+  let curveT = 0;
   let snow = [], bergs = [];
 
   // ===================== 메타(영구 저장) =====================
@@ -106,7 +112,7 @@
     };
     items = []; particles = []; texts = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0;
+    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0;
     updateHUD();
   }
 
@@ -208,6 +214,7 @@
     speed = 150 + elapsed * 3.2;                  // 점점 빨라짐
     distance += speed * dt;
     scrollY = (scrollY + speed * dt * 0.6) % 80;
+    curveT += speed * dt * 0.0055;     // 트랙이 굽이친다
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     if (player.stun > 0) player.stun -= dt;
@@ -418,39 +425,51 @@
     ctx.fillStyle = "rgba(180, 215, 235, 0.85)";
     for (const b of bergs) { ctx.beginPath(); ctx.moveTo(b.x, hy); ctx.lineTo(b.x + b.w * 0.5, hy - b.h); ctx.lineTo(b.x + b.w, hy); ctx.closePath(); ctx.fill(); }
 
-    // 빙판 길
-    const vx = W / 2;
-    ctx.fillStyle = "#dff1ff";
-    ctx.beginPath();
-    ctx.moveTo(vx - roadHalfTop(), hy); ctx.lineTo(vx + roadHalfTop(), hy);
-    ctx.lineTo(vx + roadHalfBot(), playerLineY()); ctx.lineTo(vx + roadHalfBot(), H);
-    ctx.lineTo(vx - roadHalfBot(), H); ctx.lineTo(vx - roadHalfBot(), playerLineY());
-    ctx.closePath(); ctx.fill();
-
+    // 빙판 길(굽이치는 트랙) — 슬라이스로 그린다
+    const pBottom = (H - hy) / (playerLineY() - hy);   // 화면 맨 아래까지의 깊이
+    const N = 28;
+    // 길 바깥 빙원
     ctx.fillStyle = "#eaf6ff";
-    ctx.beginPath(); ctx.moveTo(0, hy); ctx.lineTo(vx - roadHalfTop(), hy); ctx.lineTo(vx - roadHalfBot(), H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(W, hy); ctx.lineTo(vx + roadHalfTop(), hy); ctx.lineTo(vx + roadHalfBot(), H); ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-
+    ctx.fillRect(0, hy, W, H - hy);
+    // 곡선 길 슬라이스
+    ctx.fillStyle = "#dff1ff";
+    for (let i = 0; i < N; i++) {
+      const p0 = (i / N) * pBottom, p1 = ((i + 1) / N) * pBottom;
+      const y0 = projY(p0), y1 = projY(p1);
+      const c0 = curveCenterX(p0), c1 = curveCenterX(p1);
+      const h0 = halfAt(p0), h1 = halfAt(p1);
+      ctx.beginPath();
+      ctx.moveTo(c0 - h0, y0); ctx.lineTo(c0 + h0, y0);
+      ctx.lineTo(c1 + h1, y1); ctx.lineTo(c1 - h1, y1);
+      ctx.closePath(); ctx.fill();
+    }
+    // 가장자리 라인
     ctx.strokeStyle = "rgba(90, 150, 200, 0.5)"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(vx - roadHalfTop(), hy); ctx.lineTo(vx - roadHalfBot(), H);
-    ctx.moveTo(vx + roadHalfTop(), hy); ctx.lineTo(vx + roadHalfBot(), H); ctx.stroke();
-
+    for (let s = 0; s < 2; s++) {
+      const sgn = s === 0 ? -1 : 1;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p), y = projY(p);
+        if (i === 0) ctx.moveTo(c + sgn * h, y); else ctx.lineTo(c + sgn * h, y);
+      }
+      ctx.stroke();
+    }
+    // 가로 줄무늬(스크롤)
     ctx.strokeStyle = "rgba(120, 170, 210, 0.22)"; ctx.lineWidth = 1.5;
-    for (let i = 0; i < 14; i++) {
-      let t = ((i / 14) + (scrollY / 80) / 14) % 1;
-      const y = hy + (H - hy) * (t * t);
-      const half = roadHalfTop() + (roadHalfBot() - roadHalfTop()) * t;
-      ctx.globalAlpha = Math.min(1, t * 2);
-      ctx.beginPath(); ctx.moveTo(vx - half, y); ctx.lineTo(vx + half, y); ctx.stroke();
+    for (let k = 0; k < 16; k++) {
+      const u = ((k / 16) + (scrollY / 80) / 16) % 1;
+      const p = u * pBottom, y = projY(p), c = curveCenterX(p), h = halfAt(p);
+      ctx.globalAlpha = Math.min(1, u * 2);
+      ctx.beginPath(); ctx.moveTo(c - h, y); ctx.lineTo(c + h, y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
-
+    // 중앙 점선(곡선 따라)
     ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 3;
-    for (let i = 0; i < 10; i++) {
-      let t0 = ((i / 10) + (scrollY / 80) / 10) % 1, t1 = Math.min(1, t0 + 0.04);
-      ctx.globalAlpha = Math.min(1, t0 * 2);
-      ctx.beginPath(); ctx.moveTo(vx, hy + (H - hy) * (t0 * t0)); ctx.lineTo(vx, hy + (H - hy) * (t1 * t1)); ctx.stroke();
+    for (let k = 0; k < 12; k++) {
+      const u0 = ((k / 12) + (scrollY / 80) / 12) % 1, u1 = Math.min(1, u0 + 0.035);
+      const p0 = u0 * pBottom, p1 = u1 * pBottom;
+      ctx.globalAlpha = Math.min(1, u0 * 2);
+      ctx.beginPath(); ctx.moveTo(curveCenterX(p0), projY(p0)); ctx.lineTo(curveCenterX(p1), projY(p1)); ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
@@ -474,7 +493,7 @@
   function drawHole(o) {
     const sc = projScale(o.p), y = projY(o.p);
     const cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * HOLE_HALF, ry = rx * 0.42;
+    const rx = halfAt(o.p) * HOLE_HALF, ry = rx * 0.26;   // 납작하게(점프 타이밍 읽기 쉽게)
     ctx.save();
     const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
     g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
