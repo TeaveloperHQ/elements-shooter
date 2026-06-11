@@ -53,10 +53,18 @@
   function projY(p) { return horizonY() + (playerLineY() - horizonY()) * p; }
   function projScale(p) { return 0.28 + 1.0 * p; }
   function halfAt(p) { return roadHalfTop() + (roadHalfBot() - roadHalfTop()) * p; }
-  // 굽이치는 트랙: 깊이 p에서 길 중심의 화면 X (멀수록 더 휜다)
+  // 트랙 "맵": 코스의 좌우 위치를 달린 거리(z)의 함수로 정의 → 설계된 커브가 다가온다
+  const LOOKAHEAD = 1500;                 // 지평선이 앞으로 얼마나 멀리 보이는지(월드 단위)
+  function trackOffset(z) {
+    return 0.62 * Math.sin(z * 0.0012) + 0.38 * Math.sin(z * 0.00051 + 2.0);
+  }
+  // 깊이 p에서 길 중심의 화면 X. 가까운 쪽(p=1)은 카메라 기준 중앙, 먼 쪽은 코스만큼 휜다.
   function curveCenterX(p) {
-    const w = 0.3 + 0.7 * (1 - p);
-    return W / 2 + Math.sin(curveT + (1 - p) * 1.9) * (W * 0.17) * w;
+    const d = distance || 0;
+    const z = d + (1 - p) * LOOKAHEAD;
+    let off = (trackOffset(z) - trackOffset(d)) * W * 0.34;
+    off = Math.max(-W * 0.42, Math.min(W * 0.42, off));
+    return W / 2 + off;
   }
   function laneToX(p, lane) { return curveCenterX(p) + lane * halfAt(p); }
 
@@ -70,7 +78,8 @@
   let score, distance, learned, runCoins;
   let spawnTimer, elapsed, speed, scrollY, shake, screenFlash;
   let curveT = 0;
-  let snow = [], bergs = [];
+  let decorTimer = 0;
+  let snow = [], bergs = [], scenery = [];
 
   // ===================== 메타(영구 저장) =====================
   const UPGRADE_MAX = 8;
@@ -110,9 +119,9 @@
       lives: 3 + META.up.life,
       stun: 0,
     };
-    items = []; particles = []; texts = [];
+    items = []; particles = []; texts = []; scenery = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0;
+    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3;
     updateHUD();
   }
 
@@ -208,13 +217,21 @@
     }
   }
 
+  // 길가 남극 풍경(장식, 충돌 없음)
+  function spawnScenery() {
+    const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
+    const type = types[(Math.random() * types.length) | 0];
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const lane = side * (1.25 + Math.random() * 0.85);   // 길 바깥 빙원
+    scenery.push({ type: type, lane: lane, p: 0, vp: 0.10 + Math.random() * 0.02, flip: side < 0 });
+  }
+
   // ===================== 업데이트 =====================
   function update(dt) {
     elapsed += dt;
     speed = 150 + elapsed * 3.2;                  // 점점 빨라짐
     distance += speed * dt;
     scrollY = (scrollY + speed * dt * 0.6) % 80;
-    curveT += speed * dt * 0.0055;     // 트랙이 굽이친다
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     if (player.stun > 0) player.stun -= dt;
@@ -238,6 +255,15 @@
     // 스폰(속도에 비례해 잦아짐)
     spawnTimer -= dt;
     if (spawnTimer <= 0) { spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012); spawnObstacle(); }
+
+    // 길가 풍경 스폰/이동
+    decorTimer -= dt;
+    if (decorTimer <= 0) { decorTimer = 0.4 + Math.random() * 0.4; spawnScenery(); }
+    for (let i = scenery.length - 1; i >= 0; i--) {
+      const d = scenery[i];
+      d.p += d.vp * (0.5 + d.p * 1.0) * dt;
+      if (d.p > 1.18) scenery.splice(i, 1);
+    }
 
     // 점수 = 거리
     score = distance / 8;
@@ -375,6 +401,7 @@
     if (shake > 0.2) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     drawBackground();
     if (state === STATE.PLAY || state === STATE.OVER) {
+      drawScenery();
       drawItems();
       drawParticles();
       drawPlayer();
@@ -482,6 +509,77 @@
     ctx.fillStyle = "#ffffff";
     for (const s of snow) { ctx.globalAlpha = s.a; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
+  }
+
+  // ---------- 길가 남극 풍경 ----------
+  function drawScenery() {
+    const sorted = scenery.slice().sort(function (a, b) { return a.p - b.p; });
+    for (const d of sorted) {
+      const sc = projScale(d.p) * 1.15;
+      const x = laneToX(d.p, d.lane);
+      const y = projY(d.p);
+      // 발밑 그림자
+      ctx.fillStyle = "rgba(40,80,120,0.16)";
+      ctx.beginPath(); ctx.ellipse(x, y, 16 * sc, 4 * sc, 0, 0, Math.PI * 2); ctx.fill();
+      if (d.type === "igloo") drawIgloo(x, y, sc);
+      else if (d.type === "mound") drawMound(x, y, sc);
+      else if (d.type === "spikes") drawSpikes(x, y, sc);
+      else if (d.type === "sign") drawSign(x, y, sc);
+      else drawSitPenguin(x, y, sc, d.flip);
+    }
+  }
+  function drawIgloo(x, y, s) {
+    const r = 17 * s;
+    ctx.fillStyle = "#f2f8ff"; ctx.strokeStyle = "rgba(120,160,200,0.55)"; ctx.lineWidth = Math.max(1, s);
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.92, 0, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 블록 라인
+    ctx.beginPath();
+    for (let a = 1; a < 4; a++) { const yy = y - (a / 4) * r * 0.9; const hw = Math.sqrt(Math.max(0, 1 - Math.pow((y - yy) / (r * 0.92), 2))) * r; ctx.moveTo(x - hw, yy); ctx.lineTo(x + hw, yy); }
+    ctx.moveTo(x, y); ctx.lineTo(x, y - r * 0.9);
+    ctx.stroke();
+    // 입구
+    ctx.fillStyle = "#2a4a66";
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.42, r * 0.5, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+  }
+  function drawMound(x, y, s) {
+    const r = 15 * s;
+    const g = ctx.createLinearGradient(0, y - r, 0, y);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#dbe9f5");
+    ctx.fillStyle = g; ctx.strokeStyle = "rgba(150,185,215,0.5)"; ctx.lineWidth = Math.max(1, s);
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.62, 0, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function drawSpikes(x, y, s) {
+    const r = 14 * s;
+    for (let k = -1; k <= 1; k++) {
+      const px = x + k * r * 0.55, h = r * (k === 0 ? 1.5 : 1.0);
+      const g = ctx.createLinearGradient(px, y - h, px, y);
+      g.addColorStop(0, "#dff0ff"); g.addColorStop(1, "#7fb0d4");
+      ctx.fillStyle = g; ctx.strokeStyle = "rgba(80,130,175,0.5)"; ctx.lineWidth = Math.max(1, s);
+      ctx.beginPath(); ctx.moveTo(px - r * 0.32, y); ctx.lineTo(px, y - h); ctx.lineTo(px + r * 0.32, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
+  function drawSign(x, y, s) {
+    const poleH = 30 * s;
+    ctx.strokeStyle = "#9a6b3a"; ctx.lineWidth = Math.max(1.5, 2.5 * s); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - poleH); ctx.stroke();
+    ctx.fillStyle = "#e8c349"; ctx.strokeStyle = "rgba(120,90,30,0.6)"; ctx.lineWidth = Math.max(1, s);
+    const w = 22 * s, h = 13 * s;
+    ctx.fillRect(x - w / 2, y - poleH - h, w, h); ctx.strokeRect(x - w / 2, y - poleH - h, w, h);
+    ctx.fillStyle = "#5a3d12"; ctx.textAlign = "center"; ctx.font = "bold " + (8 * s + 3) + "px sans-serif";
+    ctx.fillText("S", x, y - poleH - h * 0.32); ctx.textAlign = "start";
+  }
+  function drawSitPenguin(x, y, s, flip) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(flip ? -s : s, s);
+    ctx.fillStyle = "#1b2733";
+    ctx.beginPath(); ctx.ellipse(0, -8, 8, 11, 0, 0, Math.PI * 2); ctx.fill();   // 몸
+    ctx.fillStyle = "#f4fbff";
+    ctx.beginPath(); ctx.ellipse(1, -6, 4.5, 7, 0, 0, Math.PI * 2); ctx.fill();  // 배
+    ctx.fillStyle = "#1b2733"; ctx.beginPath(); ctx.arc(2, -16, 5, 0, Math.PI * 2); ctx.fill();  // 머리
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(4, -17, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#10171f"; ctx.beginPath(); ctx.arc(4.4, -17, 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f5a623"; ctx.beginPath(); ctx.moveTo(6, -16); ctx.lineTo(9, -15); ctx.lineTo(6, -14); ctx.closePath(); ctx.fill();  // 부리
+    ctx.fillStyle = "#f5a623"; ctx.beginPath(); ctx.ellipse(0, 3, 4, 1.8, 0, 0, Math.PI * 2); ctx.fill();  // 발
+    ctx.restore();
   }
 
   // ---------- 아이템(구덩이/깃발) ----------
