@@ -1,0 +1,17 @@
+{
+  "name": "펭귄 남극 대원정 — Elements Shooter",
+  "short_name": "원소 슈터",
+  "description": "펭귄 분대를 이끌고 북극곰 무리를 막는 원소 학습 슈팅 게임",
+  "lang": "ko",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#06121f",
+  "theme_color": "#16456e",
+  "icons": [
+    { "src": "icons/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ]
+}
