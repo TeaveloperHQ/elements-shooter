@@ -130,8 +130,8 @@
       x: W / 2, targetX: W / 2, y: 0,
       run: 0,                              // 달리기 위상
       jumpY: 0, vz: 0, onGround: true,
-      jumpV: 540 + META.up.jump * 45,      // 점프력(업그레이드)
-      lives: 3 + META.up.life,
+      jumpV: 540 + META.up.jump * 45,      // 점프력(업그레이드 + 통조림 일치로 증가)
+      lives: 1 + META.up.life,             // 기본 1 — 크레바스에 빠지면 게임 오버
       stun: 0,
     };
     items = []; particles = []; texts = []; scenery = []; stored = [];
@@ -375,9 +375,9 @@
     stored.push({ symbol: el.symbol, name: el.name, color: el.color });
     score += 30; runCoins += 1;
     spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
-    spawnText(player.x, playerLineY() - 56, "🥫 " + el.symbol, "#cfe6ff", 18);
+    spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
     SND.flag();
-    showToast(el.symbol + " " + el.name + " 통조림 획득! (위에 모임)", false);
+    showToast(el.symbol + " = " + el.name + " 통조림 획득! (위에 모임)", false);
     updateHUD();
     return true;
   }
@@ -413,12 +413,14 @@
     const slotX = storedSlotX(idx);
     const c = stored.splice(idx, 1)[0];
     score += 200; runCoins += 2;
+    player.jumpV = Math.min(880, player.jumpV + 16);   // 일치할 때마다 점프력(나는 능력) ↑
     spawnText(slotX, 64, "🐟", "#bcd6e8", 22);
     spawnParticles(slotX, 64, "#cfe6f5", 12, 190);
-    spawnText(player.x, playerLineY() - 62, "🐟 " + c.symbol + " 개봉! +200", "#ffe678", 22);
+    spawnText(player.x, playerLineY() - 64, c.name + " 개봉! +200", "#ffe678", 22);
+    spawnText(player.x, playerLineY() - 90, "🪶 점프력 ↑", "#aef0c0", 16);
     shake = Math.min(12, shake + 6);
     SND.base();
-    showToast("🥫 " + c.symbol + " " + c.name + " — 따개와 일치! 정어리 +200", false);
+    showToast(c.symbol + " = " + c.name + " 일치! 정어리 +200 · 점프력 ↑", false);
     updateHUD();
     return true;
   }
@@ -495,12 +497,6 @@
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
     if (state === STATE.PLAY || state === STATE.OVER) drawStored();
-    if (state === STATE.PLAY && player.lives <= 1) {
-      const pulse = 0.18 + (Math.sin(elapsed * 6) * 0.5 + 0.5) * 0.16;
-      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.72);
-      vg.addColorStop(0, "rgba(255,0,0,0)"); vg.addColorStop(1, "rgba(255,0,0," + pulse + ")");
-      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-    }
   }
 
   function drawBackground() {
