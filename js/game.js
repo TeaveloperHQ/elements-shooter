@@ -66,11 +66,13 @@
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
   let state = STATE.MENU;
 
-  let player, bullets, enemies, gates, particles, flashes, items;
+  let player, bullets, enemies, gates, particles, flashes, items, texts;
   let score, learned;
   let spawnTimer, gateTimer, fireTimer, elapsed;
   let scrollY = 0;
   let shake = 0;
+  let lineFlash = 0;     // 방어선 돌파 시 빨강 번쩍
+  let screenFlash = 0;   // 피격 시 화면 빨강 플래시
 
   let snow = [];
   let bergs = [];
@@ -87,6 +89,7 @@
     particles = [];
     flashes = [];
     items = [];
+    texts = [];
     score = 0;
     learned = {};
     spawnTimer = 0;
@@ -94,6 +97,8 @@
     fireTimer = 0;
     elapsed = 0;
     shake = 0;
+    lineFlash = 0;
+    screenFlash = 0;
     updateHUD();
   }
 
@@ -206,6 +211,8 @@
     elapsed += dt;
     scrollY = (scrollY + dt * 90) % 80;
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
+    if (lineFlash > 0) lineFlash = Math.max(0, lineFlash - dt);
+    if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
 
     const speed = 560;
     if (keyLeft) player.targetX -= speed * dt;
@@ -231,6 +238,7 @@
     updateGates(dt);
     updateItems(dt);
     updateParticles(dt);
+    updateTexts(dt);
     updateSnow(dt);
     updateFlashes(dt);
 
@@ -329,7 +337,9 @@
     const ex = laneToX(e.p, e.lane), ey = projY(e.p);
     spawnParticles(ex, ey, "#bfe6ff", e.big ? 18 : 10, 160);
     spawnParticles(ex, ey, "#ffffff", e.big ? 10 : 5, 200);
-    score += e.big ? 25 : 10;
+    const pts = e.big ? 25 : 10;
+    score += pts;
+    spawnText(ex, ey - e.r * projScale(e.p), "+" + pts, "#eaffd0", e.big ? 16 : 13);
     enemies.splice(j, 1);
   }
 
@@ -341,10 +351,19 @@
       e.sway += dt * e.swaySpd;
       if (e.hit > 0) e.hit -= dt;
       if (e.p >= 1) {
-        if (player.shield > 0) player.shield--;
-        else player.squad--;
-        spawnParticles(laneToX(1, e.lane), playerLineY(), "#7fd0ff", 12, 200);
-        shake = Math.min(14, shake + 8);
+        const bx = laneToX(1, e.lane);
+        if (player.shield > 0) {
+          player.shield--;
+          spawnText(bx, playerLineY() - 22, "🛡 -1", "#7fd0ff", 18);
+          spawnParticles(bx, playerLineY(), "#7fd0ff", 12, 200);
+        } else {
+          player.squad--;
+          spawnText(bx, playerLineY() - 22, "-1 🐧", "#ff6b6b", 24);
+          spawnParticles(bx, playerLineY(), "#ff8a8a", 16, 220);
+          screenFlash = 0.35;
+        }
+        lineFlash = 0.5;
+        shake = Math.min(18, shake + 11);
         enemies.splice(i, 1);
         if (player.squad <= 0) { player.squad = 0; updateHUD(); gameOver(); return; }
       }
@@ -386,6 +405,11 @@
       case "score":    score += sign * n * 300; break;
     }
 
+    // 효과를 펭귄 위에 떠오르는 텍스트로
+    const icon = { squad: "🐧", weapon: "🔫", firerate: "⚡", shield: "🛡", bomb: "💥", score: "⭐" }[el.effect] || "";
+    const label = (sign > 0 ? "+" : "−") + n + " " + icon;
+    spawnText(player.x, playerLineY() - 40, label, sign > 0 ? "#aef0c0" : "#ff8a8a", 22);
+
     showToast(el.symbol + " " + el.name + " — " + el.fact, el.kind === "trap");
     spawnParticles(player.x, playerLineY() - 10, el.color, 16, 180);
     updateHUD();
@@ -397,12 +421,12 @@
     // 무작위 보상: 보호막 / 폭탄 / 점수
     const roll = Math.random();
     let type, label;
-    if (roll < 0.4) { type = "shield"; label = "🛡"; player.shield += 3; }
+    if (roll < 0.4) { type = "shield"; label = "🛡"; player.shield += 3; spawnText(x, y - 24, "보호막 +3", "#7fd0ff", 16); }
     else if (roll < 0.7) { type = "bomb"; label = "💥";
       let kills = 8; enemies.sort(function (a, b) { return b.p - a.p; });
       while (kills-- > 0 && enemies.length) killEnemy(0);
-      shake = Math.min(16, shake + 10);
-    } else { type = "score"; label = "⭐"; score += 800; }
+      shake = Math.min(16, shake + 10); spawnText(x, y - 24, "폭탄!", "#ffd070", 16);
+    } else { type = "score"; label = "⭐"; score += 800; spawnText(x, y - 24, "+800", "#ffe678", 16); }
     items.push({ x: x, y: y, life: 1.0, label: label, type: type });
   }
   function updateItems(dt) {
@@ -437,6 +461,31 @@
       flashes[i].life -= dt;
       if (flashes[i].life <= 0) flashes.splice(i, 1);
     }
+  }
+
+  // ---------- 플로팅 텍스트(획득/손실/콤보) ----------
+  function spawnText(x, y, str, color, size) {
+    texts.push({ x: x, y: y, str: str, color: color || "#ffffff",
+      size: size || 18, life: 1.0, vy: -46 });
+  }
+  function updateTexts(dt) {
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const t = texts[i];
+      t.y += t.vy * dt; t.vy += 40 * dt; t.life -= dt;
+      if (t.life <= 0) texts.splice(i, 1);
+    }
+  }
+  function drawTexts() {
+    ctx.textAlign = "center";
+    for (const t of texts) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, t.life * 1.4));
+      ctx.font = "bold " + t.size + "px sans-serif";
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.strokeText(t.str, t.x, t.y);
+      ctx.fillStyle = t.color;
+      ctx.fillText(t.str, t.x, t.y);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = "start";
   }
   function buildSnow() {
     snow = [];
@@ -479,9 +528,35 @@
       drawPlayer();
       drawFlashes();
       drawDefenseLine();
+      drawTexts();
     }
     drawSnow();
     ctx.restore();
+
+    drawOverlayFx();
+  }
+
+  // 화면 고정 연출(흔들림 영향 안 받게 restore 후)
+  function drawOverlayFx() {
+    if (screenFlash > 0) {
+      ctx.fillStyle = "rgba(255, 40, 40, " + (screenFlash * 0.5) + ")";
+      ctx.fillRect(0, 0, W, H);
+    }
+    // 펭귄이 적을 때 위험 비네팅 + 경고
+    if (state === STATE.PLAY && player && player.squad <= 2) {
+      const pulse = 0.22 + (Math.sin(elapsed * 6) * 0.5 + 0.5) * 0.18;
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.28, W / 2, H / 2, H * 0.72);
+      vg.addColorStop(0, "rgba(255,0,0,0)");
+      vg.addColorStop(1, "rgba(255,0,0," + pulse + ")");
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+      ctx.textAlign = "center";
+      ctx.globalAlpha = 0.6 + (Math.sin(elapsed * 6) * 0.5 + 0.5) * 0.4;
+      ctx.fillStyle = "#ff5a5a";
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("⚠ 펭귄이 사라지면 게임 오버!", W / 2, 84);
+      ctx.globalAlpha = 1; ctx.textAlign = "start";
+    }
   }
 
   function drawBackground() {
@@ -607,8 +682,15 @@
 
   function drawDefenseLine() {
     const y = playerLineY() + 8;
-    ctx.strokeStyle = "rgba(90, 150, 210, 0.45)";
-    ctx.setLineDash([10, 8]); ctx.lineWidth = 2;
+    const danger = lineFlash > 0;
+    if (danger) {
+      // 돌파 순간 빨간 띠
+      ctx.fillStyle = "rgba(255, 50, 50, " + (lineFlash * 0.5) + ")";
+      ctx.fillRect(0, y - 10, W, 20);
+    }
+    ctx.strokeStyle = danger ? "rgba(255, 80, 80, " + (0.5 + lineFlash) + ")"
+                             : "rgba(90, 150, 210, 0.45)";
+    ctx.setLineDash([10, 8]); ctx.lineWidth = danger ? 4 : 2;
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     ctx.setLineDash([]);
   }

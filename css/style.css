@@ -128,6 +128,14 @@ canvas#game {
   margin-bottom: 18px;
 }
 
+.desc .warn {
+  display: inline-block;
+  margin-top: 10px;
+  color: #ff9a9a;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .controls-info {
   display: flex;
   flex-direction: column;
