@@ -24,10 +24,9 @@
 
     <!-- 상단 HUD -->
     <div id="hud">
-      <div class="hud-item">🐧 <span id="hud-squad">1</span></div>
-      <div class="hud-item">무기 Lv.<span id="hud-weapon">1</span></div>
-      <div class="hud-item">🛡 <span id="hud-shield">0</span></div>
-      <div class="hud-item">🐟 <span id="hud-fish">0</span></div>
+      <div class="hud-item">❤ <span id="hud-lives">3</span></div>
+      <div class="hud-item">🏁 <span id="hud-dist">0</span>m</div>
+      <div class="hud-item">📖 <span id="hud-elem">0</span></div>
       <div class="hud-item">점수 <span id="hud-score">0</span></div>
     </div>
 
@@ -37,17 +36,18 @@
     <!-- 시작 화면 -->
     <div id="start-screen" class="overlay">
       <h1>🐧 펭귄 남극 대원정</h1>
-      <p class="subtitle">Elements Shooter</p>
+      <p class="subtitle">Antarctic Adventure</p>
       <p class="desc">
-        빙판을 덮치는 <b>북극곰 무리</b>를 눈덩이로 막아라!<br />
-        바닥의 <b>정어리 🐟(안전 원소)</b>를 주워 먹으면 강해지고,<br />
-        <b>함정 ⚠(위험 원소)</b>은 <b>점프</b>로 뛰어넘으세요!<br />
-        정어리 <b>10마리</b>마다 펭귄이 늘어납니다.<br />
-        <span class="warn">🐧 펭귄이 곧 목숨 — 북극곰·함정에 당하면 1마리씩 잃고,<br />모두 사라지면 게임 오버!</span>
+        펭귄이 빙판 길을 달린다!<br />
+        <b>얼음 구덩이</b>는 <b>점프</b>로 뛰어넘고,<br />
+        <b>원소 깃발</b>을 만나요:<br />
+        🔵 <b>안전 원소</b> 깃발은 주워서 <b>학습 + 점수</b>,<br />
+        🔴 <b>위험 원소</b>(방사능·독성) 깃발은 <b>피하세요!</b><br />
+        <span class="warn">❤ 구덩이에 빠지거나 위험 원소에 닿으면 목숨이 줄고,<br />목숨이 다하면 게임 오버!</span>
       </p>
       <div class="controls-info">
-        <span>🖱 좌우 이동: 마우스 / 터치 / ← →　　❄️ 사격: 자동</span>
-        <span>⬆️ 점프: 화면 탭 · 클릭 · Space</span>
+        <span>🖱 좌우 이동: 마우스 / 터치 / ← →</span>
+        <span>⬆️ 점프: 화면 탭 · 클릭 · Space / ↑</span>
       </div>
 
       <!-- 메타: 코인/최고점수/도감 + 영구 업그레이드 상점 -->
@@ -58,9 +58,9 @@
           <span>📖 <b id="dex-count">0</b>/<span id="dex-max">15</span></span>
         </div>
         <div class="shop">
-          <button class="up-btn" id="up-squad">🐧 시작 펭귄<br /><span class="up-info"></span></button>
-          <button class="up-btn" id="up-weapon">🔫 시작 무기<br /><span class="up-info"></span></button>
-          <button class="up-btn" id="up-shield">🛡 시작 보호막<br /><span class="up-info"></span></button>
+          <button class="up-btn" id="up-life">❤ 시작 목숨<br /><span class="up-info"></span></button>
+          <button class="up-btn" id="up-jump">⬆ 점프력<br /><span class="up-info"></span></button>
+          <button class="up-btn" id="up-magnet">🧲 자석<br /><span class="up-info"></span></button>
         </div>
       </div>
 
