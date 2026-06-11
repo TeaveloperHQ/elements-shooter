@@ -44,18 +44,22 @@
   function laneToX(p, lane) { return W / 2 + lane * halfAt(p); }
   function xToLane(x) { return (x - W / 2) / roadHalfBot(); }  // 바닥(p=1) 기준
 
-  // 게이트 한 칸(좌/우)의 사다리꼴 화면 좌표
+  // 게이트 벽 높이(원근에 따라 가까울수록 높아짐)
+  function gateWallH(p) { return 78 * projScale(p); }
+
+  // 게이트 한 칸(좌/우): 바닥에서 위로 서 있는 벽(빌보드)
   function panelGeom(pr, side) {
-    const pBot = pr.p;
-    const pTop = Math.max(0, pr.p - 0.14);
+    const p = pr.p;
     const vx = W / 2;
-    const bh = halfAt(pBot), th = halfAt(pTop);
-    const by = projY(pBot), ty = projY(pTop);
-    let x0, x1, xt0, xt1;
-    if (side < 0) { x0 = vx - bh; x1 = vx; xt0 = vx - th; xt1 = vx; }
-    else { x0 = vx; x1 = vx + bh; xt0 = vx; xt1 = vx + th; }
-    return { by: by, ty: ty, x0: x0, x1: x1, xt0: xt0, xt1: xt1,
-             cx: (x0 + x1) / 2, cy: (by + ty) / 2, scale: projScale(pBot) };
+    const half = halfAt(p);
+    const baseY = projY(p);              // 바닥에 닿는 선
+    const topY = baseY - gateWallH(p);   // 위로 솟은 높이
+    let x0, x1;
+    if (side < 0) { x0 = vx - half; x1 = vx; }
+    else { x0 = vx; x1 = vx + half; }
+    return { x0: x0, x1: x1, baseY: baseY, topY: topY,
+             cx: (x0 + x1) / 2, cy: (baseY + topY) / 2,
+             scale: projScale(p), half: half };
   }
 
   // ===================== 게임 상태 =====================
@@ -277,7 +281,7 @@
       // 게이트(원근 벽) 충돌 → 숫자 키우기 / 폭발
       for (const pr of gates) {
         if (pr.applied) continue;
-        const gBot = projY(pr.p), gTop = projY(Math.max(0, pr.p - 0.14));
+        const gBot = projY(pr.p), gTop = gBot - gateWallH(pr.p);
         if (by <= gBot && by >= gTop) {
           const half = halfAt(pr.p), vx = W / 2;
           let side = 0;
@@ -787,41 +791,50 @@
         if (panel.bursted) continue;
         const isBuff = panel.el.kind === "buff";
         const g = panelGeom(pr, panel.side);
+        const wallW = g.x1 - g.x0, wallH = g.baseY - g.topY;
 
-        // 사다리꼴 벽
-        const grad = ctx.createLinearGradient(0, g.ty, 0, g.by);
-        if (isBuff) { grad.addColorStop(0, "rgba(80, 180, 255, 0.30)"); grad.addColorStop(1, "rgba(30, 110, 200, 0.6)"); }
-        else { grad.addColorStop(0, "rgba(255, 120, 120, 0.30)"); grad.addColorStop(1, "rgba(170, 50, 60, 0.6)"); }
-        ctx.fillStyle = grad;
+        // 바닥 그림자(서 있는 느낌)
+        ctx.fillStyle = "rgba(20, 50, 80, 0.25)";
         ctx.beginPath();
-        ctx.moveTo(g.x0, g.by); ctx.lineTo(g.x1, g.by);
-        ctx.lineTo(g.xt1, g.ty); ctx.lineTo(g.xt0, g.ty);
-        ctx.closePath(); ctx.fill();
+        ctx.ellipse(g.cx, g.baseY, wallW * 0.45, 5 * g.scale, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-        ctx.strokeStyle = isBuff ? "rgba(150, 220, 255, 0.95)" : "rgba(255, 150, 150, 0.95)";
-        ctx.lineWidth = 2.5; ctx.stroke();
+        // 세로 벽(빌보드)
+        const grad = ctx.createLinearGradient(0, g.topY, 0, g.baseY);
+        if (isBuff) { grad.addColorStop(0, "rgba(120, 210, 255, 0.55)"); grad.addColorStop(1, "rgba(30, 110, 200, 0.7)"); }
+        else { grad.addColorStop(0, "rgba(255, 150, 150, 0.55)"); grad.addColorStop(1, "rgba(170, 45, 55, 0.7)"); }
+        ctx.fillStyle = grad;
+        ctx.fillRect(g.x0, g.topY, wallW, wallH);
 
-        // 큰 숫자(+N / −N)
-        const fs = Math.max(13, 30 * g.scale);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold " + fs + "px sans-serif";
-        const num = (panel.count >= 0 ? "+" : "−") + Math.abs(panel.count);
-        ctx.fillText(num, g.cx, g.cy + fs * 0.2);
+        // 기둥 + 상단 광택
+        ctx.strokeStyle = isBuff ? "rgba(170, 230, 255, 0.95)" : "rgba(255, 160, 160, 0.95)";
+        ctx.lineWidth = Math.max(1.5, 3 * g.scale);
+        ctx.strokeRect(g.x0, g.topY, wallW, wallH);
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.fillRect(g.x0, g.topY, wallW, Math.max(3, 7 * g.scale));
 
-        // 이름
-        ctx.fillStyle = "#eaf6ff";
-        ctx.font = Math.max(8, 12 * g.scale) + "px sans-serif";
-        ctx.fillText(panel.el.symbol + " " + panel.el.name, g.cx, g.by - 6 * g.scale);
-
-        // 안전 게이트 폭발 게이지
+        // 폭발 게이지(안전 게이트, 벽 상단)
         if (isBuff) {
           const prog = Math.min(1, panel.count / panel.goal);
-          const bw = 44 * g.scale, bh = 5 * g.scale, bx = g.cx - bw / 2, byy = g.ty + 4 * g.scale;
+          const bw = wallW * 0.7, bh = Math.max(3, 5 * g.scale);
+          const bx = g.cx - bw / 2, byy = g.topY + 5 * g.scale;
           ctx.fillStyle = "rgba(0,0,0,0.4)";
           ctx.fillRect(bx, byy, bw, bh);
           ctx.fillStyle = prog >= 1 ? "#fff09a" : "#ffe678";
           ctx.fillRect(bx, byy, bw * prog, bh);
         }
+
+        // 큰 숫자(+N / −N)
+        const fs = Math.max(13, 32 * g.scale);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold " + fs + "px sans-serif";
+        const num = (panel.count >= 0 ? "+" : "−") + Math.abs(panel.count);
+        ctx.fillText(num, g.cx, g.cy + fs * 0.35);
+
+        // 이름(벽 아래)
+        ctx.fillStyle = "#eaf6ff";
+        ctx.font = Math.max(8, 12 * g.scale) + "px sans-serif";
+        ctx.fillText(panel.el.symbol + " " + panel.el.name, g.cx, g.baseY - 5 * g.scale);
       }
     }
     ctx.textAlign = "start";
