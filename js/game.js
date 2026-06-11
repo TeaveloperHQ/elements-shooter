@@ -130,7 +130,9 @@
       x: W / 2, targetX: W / 2, y: 0,
       run: 0,                              // 달리기 위상
       jumpY: 0, vz: 0, onGround: true,
-      jumpV: 540 + META.up.jump * 45,      // 점프력(업그레이드 + 통조림 일치로 증가)
+      jumpV: 540 + META.up.jump * 45,      // 점프력(업그레이드 + 통조림 개봉으로 증가)
+      baseJumpV: 540 + META.up.jump * 45,  // 기준 점프력(이보다 크면 '난다')
+      flapT: 0,                            // 날갯짓 위상
       lives: 1 + META.up.life,             // 기본 1 — 크레바스에 빠지면 게임 오버
       stun: 0,
     };
@@ -236,15 +238,8 @@
       items.push({ type: "can", el: el, lane: -0.75 + Math.random() * 1.5,
         p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     } else {
-      // 통조림 따개 — 가능하면 모아둔 통조림과 일치하는 원소로(매칭 유도)
-      let el;
-      if (stored.length && Math.random() < 0.72) {
-        const c = stored[(Math.random() * stored.length) | 0];
-        el = BUFF_ELEMENTS.find(function (e) { return e.symbol === c.symbol; }) || BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
-      } else {
-        el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
-      }
-      items.push({ type: "opener", el: el, lane: -0.7 + Math.random() * 1.4,
+      // 통조림 따개(황금 열쇠) — 먹을 때마다 통조림 하나 개봉
+      items.push({ type: "opener", lane: -0.7 + Math.random() * 1.4,
         p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     }
   }
@@ -284,10 +279,13 @@
     player.y = playerLineY();
     player.run += dt * (5 + speed * 0.02);
 
-    // 점프 물리
+    // 점프 물리 (점프력이 오르면 하강 시 활공 → 더 오래 난다)
+    const flying = player.jumpV > player.baseJumpV + 1;
     if (!player.onGround) {
+      player.flapT += dt * 24;             // 날갯짓
       player.jumpY += player.vz * dt;
-      player.vz -= 1700 * dt;
+      const grav = (flying && player.vz < 0) ? 1700 * 0.5 : 1700;   // 활공
+      player.vz -= grav * dt;
       if (player.jumpY <= 0) { player.jumpY = 0; player.vz = 0; player.onGround = true; }
     }
 
@@ -358,10 +356,14 @@
       score += 5; runCoins += 1;
       spawnText(player.x, playerLineY() - player.jumpY - 36, "점프!", "#aef0c0", 18);
       spawnParticles(ox, playerLineY(), "#bfe6ff", 6, 130);
-    } else if (Math.abs(player.x - ox) < holeHalf + 8) {
-      // 구덩이에 빠짐
-      loseLife("구덩이에 빠졌다!");
-      spawnParticles(ox, playerLineY(), "#9ab8d0", 16, 220);
+    } else if (Math.abs(player.x - ox) < holeHalf + 6) {
+      // 크레바스 가운데로 빠짐 → 즉시 아웃
+      spawnParticles(ox, playerLineY(), "#9ab8d0", 22, 260);
+      spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
+      screenFlash = 0.5; shake = Math.min(22, shake + 16);
+      SND.fall();
+      updateHUD();
+      gameOver();
     }
     // 옆으로 비켜서 있으면 무사
   }
@@ -394,24 +396,16 @@
   function eatOpener(o, ox, AIR) {
     const catchR = 34 + META.up.magnet * 6;
     if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return false;
-    learned[o.el.symbol] = true;
-
     if (stored.length === 0) {
       spawnText(player.x, playerLineY() - 56, "통조림이 없어요!", "#ffcf9a", 16);
       SND.bad();
       showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
       return true;
     }
-    const idx = stored.findIndex(function (c) { return c.symbol === o.el.symbol; });
-    if (idx === -1) {
-      spawnText(player.x, playerLineY() - 56, o.el.symbol + " 통조림 없음!", "#ffcf9a", 16);
-      SND.bad();
-      showToast("⚠ " + o.el.symbol + " " + o.el.name + " 따개 — 일치하는 통조림이 위에 없어요!", true);
-      return true;
-    }
-    // 일치 → 그 통조림만 개봉
-    const slotX = storedSlotX(idx);
-    const c = stored.splice(idx, 1)[0];
+    // 통조림 하나 개봉(가장 최근 것)
+    const slotX = storedSlotX(stored.length - 1);
+    const c = stored.pop();
+    learned[c.symbol] = true;
     score += 200; runCoins += 2;
     player.jumpV = Math.min(880, player.jumpV + 16);   // 일치할 때마다 점프력(나는 능력) ↑
     spawnText(slotX, 64, "🐟", "#bcd6e8", 22);
@@ -420,7 +414,7 @@
     spawnText(player.x, playerLineY() - 90, "🪶 점프력 ↑", "#aef0c0", 16);
     shake = Math.min(12, shake + 6);
     SND.base();
-    showToast(c.symbol + " = " + c.name + " 일치! 정어리 +200 · 점프력 ↑", false);
+    showToast(c.symbol + " = " + c.name + " 통조림 개봉! 정어리 +200 · 점프력 ↑", false);
     updateHUD();
     return true;
   }
@@ -862,51 +856,40 @@
   }
 
   // 통조림 따개(돌려 따는 도구 모양 + 원소 이름 한글 태그)
+  // 통조림 따개 = 정어리 통조림 황금 열쇠(테마형, 배지 없음)
   function drawOpener(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
     drawCatchMarker(x, gy, sc, o);
-    const bob = Math.sin(o.wave) * 2 * sc;
-    const hy = gy - 16 * sc + bob;     // 도구 본체 중심
+    const bob = Math.sin(o.wave) * 2.5 * sc;
+    const cy = gy - 24 * sc + bob;
 
     // 그림자
-    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 14 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 9 * sc, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
 
     ctx.save();
-    ctx.translate(x, hy);
-    // 빨간 손잡이(두 다리)
-    ctx.fillStyle = "#d8444f"; ctx.strokeStyle = "rgba(120,30,40,0.5)"; ctx.lineWidth = Math.max(1, sc);
-    ctx.fillRect(-7 * sc, 3 * sc, 5 * sc, 15 * sc); ctx.strokeRect(-7 * sc, 3 * sc, 5 * sc, 15 * sc);
-    ctx.fillRect(2 * sc, 3 * sc, 5 * sc, 15 * sc); ctx.strokeRect(2 * sc, 3 * sc, 5 * sc, 15 * sc);
-    // 금속 헤드(타원)
-    ctx.fillStyle = "#e1e8ef"; ctx.strokeStyle = "rgba(90,120,150,0.6)"; ctx.lineWidth = Math.max(1, sc);
-    ctx.beginPath(); ctx.ellipse(0, 0, 13 * sc, 8 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // 톱니 절단 바퀴(왼쪽)
-    const gx = -5 * sc, gr = 5.2 * sc, teeth = 8;
-    ctx.fillStyle = "#8fa1b2"; ctx.beginPath();
-    for (let i = 0; i <= teeth * 2; i++) {
-      const a = i / (teeth * 2) * Math.PI * 2, rr = (i % 2 ? gr * 0.6 : gr);
-      const px = gx + Math.cos(a) * rr, py = Math.sin(a) * rr;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#5f7080"; ctx.beginPath(); ctx.arc(gx, 0, gr * 0.32, 0, Math.PI * 2); ctx.fill();
-    // 나비 손잡이(오른쪽 돌리는 키)
-    ctx.fillStyle = "#b9c4cf"; ctx.strokeStyle = "rgba(90,120,150,0.5)";
-    ctx.beginPath(); ctx.ellipse(8 * sc, -2 * sc, 3.4 * sc, 1.8 * sc, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(8 * sc, 2 * sc, 3.4 * sc, 1.8 * sc, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.translate(x, cy);
+    ctx.rotate(Math.sin(o.wave) * 0.12);
+    const gold = ctx.createLinearGradient(-8 * sc, -10 * sc, 8 * sc, 12 * sc);
+    gold.addColorStop(0, "#fff0b8"); gold.addColorStop(0.5, "#f3c13c"); gold.addColorStop(1, "#c98e1e");
+
+    // 손잡이 고리(타원 루프)
+    ctx.strokeStyle = gold; ctx.lineWidth = 3.4 * sc; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.ellipse(0, -7 * sc, 6 * sc, 5 * sc, 0, 0, Math.PI * 2); ctx.stroke();
+    // 샤프트
+    ctx.fillStyle = gold; ctx.strokeStyle = "rgba(150,100,20,0.5)"; ctx.lineWidth = Math.max(1, sc * 0.8);
+    ctx.fillRect(-1.6 * sc, -2 * sc, 3.2 * sc, 12 * sc); ctx.strokeRect(-1.6 * sc, -2 * sc, 3.2 * sc, 12 * sc);
+    // 키 비트(통조림 마는 칸)
+    ctx.fillRect(-3.4 * sc, 6.5 * sc, 6.8 * sc, 2.4 * sc); ctx.strokeRect(-3.4 * sc, 6.5 * sc, 6.8 * sc, 2.4 * sc);
+    ctx.fillRect(-3.4 * sc, 9.6 * sc, 4.2 * sc, 2.2 * sc); ctx.strokeRect(-3.4 * sc, 9.6 * sc, 4.2 * sc, 2.2 * sc);
+    // 반짝임
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.beginPath(); ctx.ellipse(-3 * sc, -9 * sc, 1.5 * sc, 1 * sc, -0.5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    // 한글 원소 이름 태그(도구 위)
-    const ty = hy - 16 * sc;
-    const fs = 8 * sc + 5;
-    ctx.font = "bold " + fs + "px sans-serif";
-    const tw = ctx.measureText(o.el.name).width + 12 * sc;
-    ctx.fillStyle = "rgba(18,28,42,0.88)"; ctx.fillRect(x - tw / 2, ty - fs, tw, fs + 5 * sc);
-    ctx.strokeStyle = "rgba(255,210,150,0.8)"; ctx.lineWidth = Math.max(1, sc); ctx.strokeRect(x - tw / 2, ty - fs, tw, fs + 5 * sc);
-    ctx.fillStyle = "#ffe6b0"; ctx.textAlign = "center";
-    ctx.fillText(o.el.name, x, ty - 1 * sc);
-    ctx.textAlign = "start";
+    // 작은 별 반짝임
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath(); ctx.arc(x + 9 * sc, cy - 9 * sc, 1.3 * sc, 0, Math.PI * 2); ctx.fill();
   }
 
   // 상단 통조림 보관함
@@ -947,24 +930,28 @@
     const shS = 1 - Math.min(0.55, lift / 150);
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
-    drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0);
+    const flying = !player.onGround && player.jumpV > player.baseJumpV + 1;
+    drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0, flying, player.flapT);
   }
 
-  function drawPenguin(x, y, s, phase, stun) {
+  function drawPenguin(x, y, s, phase, stun, fly, flapPhase) {
     const wad = Math.sin(phase) * 0.07;
     const stepL = Math.max(0, Math.sin(phase)) * 3;
     const stepR = Math.max(0, Math.sin(phase + Math.PI)) * 3;
-    const flap = Math.sin(phase) * 0.16;
+    // 날 때는 날개를 크게 펄럭(위로 활짝 ↔ 아래로)
+    const flap = fly ? (0.9 + Math.sin(flapPhase) * 0.9) : Math.sin(phase) * 0.16;
+    const wingLen = fly ? 11 : 8;
     ctx.save();
     ctx.translate(x, y);
     if (stun) ctx.globalAlpha = 0.45 + 0.4 * Math.sin(phase * 5);
     ctx.rotate(wad);
     ctx.scale(s, s);
 
-    // 발(번갈아)
+    // 발(번갈아 — 날 땐 모음)
     ctx.fillStyle = "#f5a623";
-    ctx.beginPath(); ctx.ellipse(-4, 5 - stepL, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(4, 5 - stepR, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
+    const fl = fly ? 0 : stepL, fr = fly ? 0 : stepR;
+    ctx.beginPath(); ctx.ellipse(-4, 5 - fl, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4, 5 - fr, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
     // 꼬리
     ctx.fillStyle = "#11202b"; ctx.beginPath(); ctx.moveTo(-3, 3); ctx.lineTo(3, 3); ctx.lineTo(0, 9); ctx.closePath(); ctx.fill();
     // 몸통(등)
@@ -972,10 +959,15 @@
     bg.addColorStop(0, "#2c3b4b"); bg.addColorStop(1, "#131e28");
     ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(0, -9, 11, 14, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "rgba(120,150,180,0.2)"; ctx.beginPath(); ctx.ellipse(-2, -12, 4, 7, -0.2, 0, Math.PI * 2); ctx.fill();
-    // 날개(펄럭)
+    // 날개(날 땐 크게 펄럭)
     ctx.fillStyle = "#0e1a24";
-    ctx.save(); ctx.translate(-10, -8); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(0, 0, 3.2, 8, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(10, -8); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(0, 0, 3.2, 8, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(-9, -10); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.2, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(9, -10); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.2, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    // 날 때 반짝이는 활공 효과
+    if (fly) {
+      ctx.fillStyle = "rgba(180,235,255,0.5)";
+      ctx.beginPath(); ctx.arc(0, 8, 5, 0, Math.PI * 2); ctx.fill();
+    }
     // 빨간 목도리
     ctx.fillStyle = "#e23b3b"; ctx.fillRect(-8, -16, 16, 3.5);
     ctx.beginPath(); ctx.moveTo(6, -14); ctx.lineTo(11, -8 + flap * 6); ctx.lineTo(8, -13); ctx.closePath(); ctx.fill();
