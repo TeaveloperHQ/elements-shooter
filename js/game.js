@@ -139,7 +139,7 @@
       flapT: 0,                            // 날갯짓 위상
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
-      stun: 0,
+      stun: 0, tumble: 0,
     };
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
@@ -294,6 +294,7 @@
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     if (player.stun > 0) player.stun -= dt;
+    if (player.tumble > 0) player.tumble -= dt;
 
     // 이동(스턴 중엔 둔해짐)
     const mv = (player.stun > 0 ? 300 : 560);
@@ -372,15 +373,24 @@
       // ----- 크레바스: 길이(len)만큼 플레이어 선을 지나가는 동안 계속 판정 -----
       if (o.type === "hole") {
         const frontP = o.p, backP = o.p - o.len;
+        const big = o.len > 0.1;
         const overLine = backP <= 1 && frontP >= 1;          // 플레이어 선이 구덩이 위
         if (overLine && player.onGround) {
           const ox = laneToX(1, o.lane), holeHalf = halfAt(1) * o.w;
-          if (Math.abs(player.x - ox) < holeHalf + 6) {       // 구덩이에 발이 닿음 → 아웃
-            spawnParticles(ox, playerLineY(), "#9ab8d0", 24, 260);
-            spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
-            screenFlash = 0.6; shake = Math.min(24, shake + 18);
-            SND.fall(); updateHUD(); gameOver();
-            return;
+          const dist = Math.abs(player.x - ox);
+          if (dist < holeHalf + 6) {
+            if (big || dist < holeHalf * 0.45) {
+              // 정가운데(또는 거대 협곡)로 빠짐 → 즉시 아웃
+              spawnParticles(ox, playerLineY(), "#9ab8d0", 24, 260);
+              spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
+              screenFlash = 0.6; shake = Math.min(24, shake + 18);
+              SND.fall(); updateHUD(); gameOver();
+              return;
+            } else if (!o.tripped) {
+              // 가장자리 돌부리에 걸림 → 넘어지고 에너지 감소(생존)
+              o.tripped = true;
+              tripPenguin(ox);
+            }
           }
         }
         if (!o.cleared && backP > 1) {                        // 무사 통과
@@ -409,6 +419,18 @@
       }
       if (o.p > 1.1) items.splice(i, 1);
     }
+  }
+
+  // 돌부리에 걸려 넘어짐: 에너지 감소 + 비틀거림(아웃은 아님)
+  function tripPenguin(ox) {
+    player.energy = Math.max(0, player.energy - 22);
+    player.stun = 0.7;
+    player.tumble = 0.6;
+    screenFlash = 0.22; shake = Math.min(16, shake + 9);
+    spawnParticles(ox, playerLineY(), "#dfe9f2", 12, 180);
+    spawnText(player.x, playerLineY() - 44, "돌부리에 걸려 넘어짐! 💫", "#ffcf9a", 18);
+    SND.bad();
+    updateHUD();
   }
 
   // 정어리 통조림: 주우면 상단 보관함에 쌓인다. 먹으면 true 반환(즉시 제거).
@@ -1152,19 +1174,22 @@
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
     const flying = !player.onGround && holdJump && player.energy > 0;
-    drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0, flying, player.flapT);
+    drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0, flying, player.flapT, player.tumble);
   }
 
-  function drawPenguin(x, y, s, phase, stun, fly, flapPhase) {
-    const wad = Math.sin(phase) * 0.07;
+  function drawPenguin(x, y, s, phase, stun, fly, flapPhase, tumble) {
+    const fall = (tumble && tumble > 0) ? Math.min(1, tumble / 0.6) : 0;
+    let wad = Math.sin(phase) * 0.07;
+    if (fall > 0) wad = -0.75 * fall + Math.sin(tumble * 26) * 0.12 * fall;   // 앞으로 휘청
     const stepL = Math.max(0, Math.sin(phase)) * 3;
     const stepR = Math.max(0, Math.sin(phase + Math.PI)) * 3;
-    // 날 때는 날개를 크게 펄럭(위로 활짝 ↔ 아래로)
-    const flap = fly ? (0.9 + Math.sin(flapPhase) * 0.9) : Math.sin(phase) * 0.16;
+    // 날 때는 날개를 크게 펄럭 / 넘어질 땐 날개 버둥
+    const flap = fall > 0 ? Math.sin(tumble * 30) * 0.9
+      : (fly ? (0.9 + Math.sin(flapPhase) * 0.9) : Math.sin(phase) * 0.16);
     const wingLen = fly ? 11 : 8;
     ctx.save();
-    ctx.translate(x, y);
-    if (stun) ctx.globalAlpha = 0.45 + 0.4 * Math.sin(phase * 5);
+    ctx.translate(x, y + fall * 5);
+    if (stun && fall <= 0) ctx.globalAlpha = 0.45 + 0.4 * Math.sin(phase * 5);
     ctx.rotate(wad);
     ctx.scale(s, s);
 
