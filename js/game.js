@@ -85,16 +85,16 @@
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
   const STAGE_LEN = 3500;
   const STAGES = [
-    { key: "iceberg",   name: "남극",      icon: "🐧" },
-    { key: "moai",      name: "이스터섬",  icon: "🗿" },
-    { key: "liberty",   name: "미국",      icon: "🗽" },
-    { key: "clock",     name: "영국",      icon: "🎡" },
-    { key: "eiffel",    name: "프랑스",    icon: "🗼" },
-    { key: "windmill",  name: "네덜란드",  icon: "🌷" },
-    { key: "pisa",      name: "이탈리아",  icon: "🍕" },
-    { key: "pyramid",   name: "이집트",    icon: "🐫" },
-    { key: "taj",       name: "인도",      icon: "🕌" },
-    { key: "northpole", name: "북극",      icon: "❄️" },
+    { key: "iceberg",   name: "남극",      icon: "🐧", tint: null },
+    { key: "moai",      name: "이스터섬",  icon: "🗿", tint: "rgba(80,200,180,0.12)" },
+    { key: "liberty",   name: "미국",      icon: "🗽", tint: "rgba(120,160,210,0.10)" },
+    { key: "clock",     name: "영국",      icon: "🎡", tint: "rgba(150,160,175,0.16)" },
+    { key: "eiffel",    name: "프랑스",    icon: "🗼", tint: "rgba(210,150,200,0.14)" },
+    { key: "windmill",  name: "네덜란드",  icon: "🌷", tint: "rgba(120,200,170,0.12)" },
+    { key: "pisa",      name: "이탈리아",  icon: "🍕", tint: "rgba(255,180,120,0.16)" },
+    { key: "pyramid",   name: "이집트",    icon: "🐫", tint: "rgba(255,170,80,0.22)" },
+    { key: "taj",       name: "인도",      icon: "🕌", tint: "rgba(255,150,110,0.20)" },
+    { key: "northpole", name: "북극",      icon: "❄️", tint: "rgba(150,210,255,0.16)" },
   ];
   function stageIndex() { return Math.min(STAGES.length - 1, Math.floor(distance / STAGE_LEN)); }
   function stageLandmark() { return STAGES[stageIndex()]; }
@@ -804,6 +804,10 @@
     const vgr = ctx.createLinearGradient(0, 0, 0, H * 0.25);
     vgr.addColorStop(0, "rgba(0,10,25,0.35)"); vgr.addColorStop(1, "rgba(0,10,25,0)");
     ctx.fillStyle = vgr; ctx.fillRect(0, 0, W, H * 0.25);
+
+    // 스테이지(나라)별 색감 — 은은한 분위기 틴트
+    const tint = stageLandmark().tint;
+    if (tint) { ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H); }
   }
 
   function drawSnow() {
@@ -1298,32 +1302,42 @@
     ctx.scale(s, s);
 
     // 발(번갈아 — 날 땐 모음)
-    ctx.fillStyle = "#f5a623";
+    ctx.fillStyle = "#f5a623"; ctx.strokeStyle = "#c87f12"; ctx.lineWidth = 0.8;
     const fl = fly ? 0 : stepL, fr = fly ? 0 : stepR;
-    ctx.beginPath(); ctx.ellipse(-4, 5 - fl, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(4, 5 - fr, 3.6, 2.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-4, 5 - fl, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(4, 5 - fr, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // 꼬리
     ctx.fillStyle = "#11202b"; ctx.beginPath(); ctx.moveTo(-3, 3); ctx.lineTo(3, 3); ctx.lineTo(0, 9); ctx.closePath(); ctx.fill();
-    // 몸통(등)
-    const bg = ctx.createLinearGradient(0, -23, 0, 5);
-    bg.addColorStop(0, "#2c3b4b"); bg.addColorStop(1, "#131e28");
-    ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(0, -9, 11, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(120,150,180,0.2)"; ctx.beginPath(); ctx.ellipse(-2, -12, 4, 7, -0.2, 0, Math.PI * 2); ctx.fill();
+    // 몸통(등) + 테두리
+    const bg = ctx.createLinearGradient(-8, -23, 8, 5);
+    bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
+    ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.ellipse(0, -9, 11, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 흰 배 가장자리(양옆 살짝 보임) — 검은 덩어리 느낌 완화
+    ctx.fillStyle = "rgba(244,251,255,0.9)";
+    ctx.beginPath(); ctx.ellipse(-6.5, -7, 2.2, 8.5, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6.5, -7, 2.2, 8.5, -0.12, 0, Math.PI * 2); ctx.fill();
+    // 등 림라이트(좌상단 빛)
+    ctx.fillStyle = "rgba(150,185,215,0.28)"; ctx.beginPath(); ctx.ellipse(-3, -13, 3.5, 7, -0.25, 0, Math.PI * 2); ctx.fill();
     // 날개(날 땐 크게 펄럭)
     ctx.fillStyle = "#0e1a24";
-    ctx.save(); ctx.translate(-9, -10); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.2, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(9, -10); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.2, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(-9, -10); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.4, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(9, -10); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.4, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     // 날 때 반짝이는 활공 효과
     if (fly) {
       ctx.fillStyle = "rgba(180,235,255,0.5)";
       ctx.beginPath(); ctx.arc(0, 8, 5, 0, Math.PI * 2); ctx.fill();
     }
-    // 빨간 목도리
-    ctx.fillStyle = "#e23b3b"; ctx.fillRect(-8, -16, 16, 3.5);
-    ctx.beginPath(); ctx.moveTo(6, -14); ctx.lineTo(11, -8 + flap * 6); ctx.lineTo(8, -13); ctx.closePath(); ctx.fill();
-    // 뒤통수
-    ctx.fillStyle = "#1b2733"; ctx.beginPath(); ctx.arc(0, -22, 8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(120,150,180,0.16)"; ctx.beginPath(); ctx.arc(-2, -24, 3, 0, Math.PI * 2); ctx.fill();
+    // 빨간 목도리 + 매듭 + 펄럭이는 자락
+    ctx.fillStyle = "#e23b3b"; ctx.strokeStyle = "#a82626"; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.ellipse(0, -15, 8.5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#c92f2f"; ctx.beginPath();
+    ctx.moveTo(5.5, -14); ctx.lineTo(11 + flap * 4, -9 + flap * 7); ctx.lineTo(7.5, -12.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.6, 0, Math.PI * 2); ctx.fill();
+    // 뒤통수 + 하이라이트
+    ctx.fillStyle = "#1b2733"; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(0, -22, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.5, -24, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -1388,12 +1402,14 @@
 
   // 스크린샷/디버그용: ?auto 면 자동 시작
   if (location.search.indexOf("auto") >= 0 || location.hash.indexOf("auto") >= 0) {
-    setTimeout(startGame, 30);
+    startGame();
   }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
     startGame(); state = STATE.PLAY; galleryMode = true;
     player.energy = 72;
+    const m = location.search.match(/stage=(\d+)/);
+    if (m) distance = (+m[1]) * STAGE_LEN + 100;   // 색감 확인용 스테이지 강제
     items = [
       { type: "can", el: BUFF_ELEMENTS[0], lane: -0.55, p: 0.42, vp: 0, done: false, wave: 0.5 },
       { type: "can", el: BUFF_ELEMENTS[2], lane: 0.55, p: 0.30, vp: 0, done: false, wave: 2.0 },
