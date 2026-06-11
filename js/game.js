@@ -471,7 +471,7 @@
       // 보스 충돌
       if (boss) {
         const bs = projScale(boss.p);
-        const bxx = laneToX(boss.p, boss.lane), byy = projY(boss.p) - boss.r * bs * 1.5;
+        const bxx = laneToX(boss.p, boss.lane), byy = projY(boss.p) - boss.r * bs * 0.9;
         const rad = boss.r * bs * 1.5 + 6 * projScale(b.p);
         const dx = bx - bxx, dy = by - byy;
         if (dx * dx + dy * dy <= rad * rad) {
@@ -487,8 +487,8 @@
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j];
         const es = projScale(e.p);
-        const ex = laneToX(e.p, e.lane), ey = projY(e.p) - e.r * es * 1.3;  // 몸통 중심
-        const rad = e.r * es * 1.5 + 6 * projScale(b.p);
+        const ex = laneToX(e.p, e.lane), ey = projY(e.p) - e.r * es * 0.85;  // 몸통 중심
+        const rad = e.r * es * 1.4 + 6 * projScale(b.p);
         const dx = bx - ex, dy = by - ey;
         if (dx * dx + dy * dy <= rad * rad) {
           if (e.shell > 0) {
@@ -1175,51 +1175,51 @@
     ctx.restore();
   }
 
-  // 전신 북극곰 + 걷기 애니메이션. 발이 원점(0,0), 위로 그림.
+  // 사족보행 북극곰(카메라 쪽으로 달려듦) + 걷기 애니메이션. 발이 원점(0,0).
+  // 머리/어깨가 앞(아래·크게), 등이 뒤(위), 네 다리로 바닥을 짚는다.
   function drawPolarBear(r, light, dark, walk, hitFlash, isBoss) {
     const L = hitFlash ? "#ffffff" : light;
     const D = hitFlash ? "#ffd2d2" : dark;
     const ol = "rgba(50,80,115,0.5)";
     const lw = Math.max(1, r * 0.08);
 
-    const s1 = Math.sin(walk), s2 = Math.sin(walk + Math.PI);
-    const swA = s1 * r * 0.3, swB = s2 * r * 0.3;          // 다리 앞뒤 스윙
-    const liftA = Math.max(0, s1) * r * 0.16;              // 발 들어올림
-    const liftB = Math.max(0, s2) * r * 0.16;
-    const bob = Math.abs(s1) * r * 0.05;
+    // 사족 보행 사이클: 앞다리/뒷다리 번갈아
+    const fS = Math.sin(walk), bS = Math.sin(walk + Math.PI);
+    const fSw = fS * r * 0.22, bSw = bS * r * 0.22;        // 앞뒤 스윙
+    const fLift = Math.max(0, fS) * r * 0.18;              // 발 들어올림
+    const bLift = Math.max(0, bS) * r * 0.18;
+    const bob = Math.abs(Math.sin(walk)) * r * 0.05;
 
-    const legH = r * 0.9;
-    const hipY = -legH - bob;
-    const torsoW = r * 1.7, torsoH = r * 1.4;
-    const torsoCY = hipY - torsoH * 0.4;
-    const headR = r * 0.82;
-    const headCY = torsoCY - torsoH * 0.42 - headR * 0.55;
+    const bodyCY = -r * 1.0 - bob;     // 등(뒤·위)
+    const headR = r * 0.92;
+    const headCY = -r * 0.62 - bob * 0.5;  // 머리(앞·아래)
 
-    // 뒷다리(뒤·어둡게)
     ctx.lineCap = "round";
-    ctx.strokeStyle = D; ctx.lineWidth = r * 0.42;
-    ctx.beginPath(); ctx.moveTo(-torsoW * 0.3, hipY); ctx.lineTo(-torsoW * 0.3 + swB, -liftB); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(torsoW * 0.3, hipY); ctx.lineTo(torsoW * 0.3 + swA, -liftA); ctx.stroke();
 
-    // 몸통
+    // 뒷다리(뒤·어둡게) — 등 뒤에서 바닥으로
+    ctx.strokeStyle = D; ctx.lineWidth = r * 0.34;
+    ctx.beginPath(); ctx.moveTo(-r * 0.5, bodyCY + r * 0.25); ctx.lineTo(-r * 0.55 + bSw, -bLift); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.5, bodyCY + r * 0.25); ctx.lineTo(r * 0.55 + bSw, -bLift); ctx.stroke();
+
+    // 등/몸통(낮고 둥근 덩치)
     ctx.fillStyle = L; ctx.strokeStyle = ol; ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.ellipse(0, torsoCY, torsoW * 0.5, torsoH * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.beginPath(); ctx.ellipse(0, torsoCY + torsoH * 0.14, torsoW * 0.34, torsoH * 0.34, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, bodyCY, r * 0.98, r * 0.68, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.ellipse(-r * 0.12, bodyCY - r * 0.12, r * 0.5, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 앞다리(앞·밝게)
-    ctx.strokeStyle = L; ctx.lineWidth = r * 0.46;
-    ctx.beginPath(); ctx.moveTo(-torsoW * 0.22, hipY + r * 0.1); ctx.lineTo(-torsoW * 0.22 + swA, -liftA); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(torsoW * 0.22, hipY + r * 0.1); ctx.lineTo(torsoW * 0.22 + swB, -liftB); ctx.stroke();
-    ctx.fillStyle = "rgba(70,100,135,0.45)";
-    ctx.beginPath(); ctx.ellipse(-torsoW * 0.22 + swA, -liftA, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(torsoW * 0.22 + swB, -liftB, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    // 앞다리(앞·밝게) — 어깨에서 바닥으로
+    ctx.strokeStyle = L; ctx.lineWidth = r * 0.4;
+    ctx.beginPath(); ctx.moveTo(-r * 0.52, bodyCY + r * 0.4); ctx.lineTo(-r * 0.64 + fSw, -fLift); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.52, bodyCY + r * 0.4); ctx.lineTo(r * 0.64 + fSw, -fLift); ctx.stroke();
+    ctx.fillStyle = "rgba(70,100,135,0.45)";   // 앞발
+    ctx.beginPath(); ctx.ellipse(-r * 0.64 + fSw, -fLift, r * 0.2, r * 0.11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.64 + fSw, -fLift, r * 0.2, r * 0.11, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 머리(+왕관)
+    // 머리(앞·아래, 가장 크게) + 왕관
     drawBearHead(0, headCY, headR, L, D, ol, lw);
     if (isBoss) drawBearCrown(0, headCY - headR, headR);
 
-    return { headCY: headCY, headR: headR };
+    return { topY: headCY - headR * 1.35, headCY: headCY, headR: headR };
   }
 
   // ---------- 북극곰 적 ----------
@@ -1241,28 +1241,28 @@
       ctx.fillStyle = "rgba(40,80,120,0.2)";
       ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.32, 0, 0, Math.PI * 2); ctx.fill();
 
-      drawPolarBear(r, c[0], c[1], e.walk, e.hit > 0, false);
+      const info = drawPolarBear(r, c[0], c[1], e.walk, e.hit > 0, false);
 
       // 원거리형: 등에 눈 대포
       if (e.kind === "ranged") {
         ctx.fillStyle = "#8a5a2a";
-        ctx.fillRect(-r * 0.16, -r * 3.05, r * 0.32, r * 0.6);
+        ctx.fillRect(-r * 0.16, -r * 1.9, r * 0.32, r * 0.55);
         ctx.fillStyle = "#5e3c1c";
-        ctx.fillRect(-r * 0.16, -r * 3.05, r * 0.32, r * 0.16);
+        ctx.fillRect(-r * 0.16, -r * 1.9, r * 0.32, r * 0.16);
       }
       // 얼음 껍질(안 깨진 동안) — 몸 전체를 감싸는 얼음막
       if (e.shell > 0) {
         ctx.strokeStyle = "rgba(225,248,255,0.95)";
         ctx.fillStyle = "rgba(205,238,255,0.22)";
         ctx.lineWidth = Math.max(1.5, 2.5 * sc);
-        ctx.beginPath(); ctx.ellipse(0, -r * 1.5, r * 1.45, r * 2.0, 0, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.ellipse(0, -r * 0.85, r * 1.3, r * 1.2, 0, 0, Math.PI * 2);
         ctx.fill(); ctx.stroke();
       }
       ctx.restore();
 
       // 체력바(머리 위)
       if (e.hp < e.maxHp) {
-        const barY = ey - r * 3.4;
+        const barY = ey + info.topY - 6;
         ctx.fillStyle = "rgba(10,30,50,0.55)";
         ctx.fillRect(ex - r, barY, r * 2, 4);
         ctx.fillStyle = "#6fe0a0";
@@ -1330,7 +1330,7 @@
 
     // 머리 위 떠있는 HP바
     const bw = r * 2.4, bh = 6 * sc + 2;
-    const bxx = bx - bw / 2, byy = ey + info.headCY - info.headR - r * 0.8;
+    const bxx = bx - bw / 2, byy = ey + info.topY - r * 0.5;
     ctx.fillStyle = "rgba(10,30,50,0.6)";
     ctx.fillRect(bxx, byy, bw, bh);
     ctx.fillStyle = "#ff5a6a";
