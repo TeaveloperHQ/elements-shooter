@@ -1045,6 +1045,16 @@
 
   // 통조림 따개(돌려 따는 도구 모양 + 원소 이름 한글 태그)
   // 통조림 따개(손잡이 두 개 + 톱니 절단바퀴 + 나비 노브 — 확실한 캔 오프너)
+  // 4점 반짝임
+  function oSparkle(cx, cy, r, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.32, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r * 0.32, cy); ctx.closePath();
+    ctx.moveTo(cx - r, cy); ctx.lineTo(cx, cy + r * 0.32); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy - r * 0.32); ctx.closePath();
+    ctx.fill();
+  }
+
+  // 통조림 따개 — 아이시/귀여운 스타일(둥근 틸 손잡이 + 흰 헤드 + 톱니바퀴 + 금색 나비 노브)
   function drawOpener(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
@@ -1055,39 +1065,52 @@
     // 그림자
     ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 11 * sc, 2.8 * sc, 0, 0, Math.PI * 2); ctx.fill();
 
+    // 부드러운 후광
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const aura = ctx.createRadialGradient(x, cy, 1, x, cy, 22 * sc);
+    aura.addColorStop(0, "rgba(170,230,255,0.45)"); aura.addColorStop(1, "rgba(170,230,255,0)");
+    ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(x, cy, 22 * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
     ctx.save();
     ctx.translate(x, cy);
-    ctx.rotate(Math.sin(o.wave) * 0.1);
+    ctx.rotate(Math.sin(o.wave) * 0.08);
 
-    // 손잡이 두 개(빨간 그립)
-    ctx.lineCap = "round"; ctx.strokeStyle = "#d8444f"; ctx.lineWidth = 4.4 * sc;
-    ctx.beginPath(); ctx.moveTo(-2 * sc, 0); ctx.lineTo(-7 * sc, 14 * sc); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(2 * sc, 0); ctx.lineTo(7 * sc, 14 * sc); ctx.stroke();
-    ctx.strokeStyle = "rgba(255,165,165,0.7)"; ctx.lineWidth = 1.3 * sc;
-    ctx.beginPath(); ctx.moveTo(-3 * sc, 2.5 * sc); ctx.lineTo(-6 * sc, 12 * sc); ctx.stroke();
+    // 손잡이(둥근 틸 캡슐)
+    const hg = ctx.createLinearGradient(-4 * sc, 2 * sc, 4 * sc, 17 * sc);
+    hg.addColorStop(0, "#8fd6ff"); hg.addColorStop(1, "#2f8fe0");
+    ctx.fillStyle = hg; ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.beginPath(); ctx.ellipse(0, 9 * sc, 3.6 * sc, 8 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.ellipse(-1.3 * sc, 6 * sc, 1.1 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 금속 헤드(몸체)
-    ctx.fillStyle = "#e6edf3"; ctx.strokeStyle = "rgba(90,120,150,0.65)"; ctx.lineWidth = Math.max(1, sc);
-    ctx.beginPath(); ctx.ellipse(0, -2 * sc, 8.5 * sc, 5.5 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 헤드(둥근 흰/아이시 몸체 + 금테)
+    const headg = ctx.createRadialGradient(-2.5 * sc, -3.5 * sc, 1, 0, -2 * sc, 9 * sc);
+    headg.addColorStop(0, "#ffffff"); headg.addColorStop(1, "#dceaf6");
+    ctx.fillStyle = headg; ctx.strokeStyle = "#ffd24a"; ctx.lineWidth = Math.max(1.5, 1.9 * sc);
+    ctx.beginPath(); ctx.ellipse(0, -2 * sc, 8.5 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-    // 톱니 절단 바퀴(위 가운데)
-    const gr = 3.8 * sc, teeth = 9, gyy = -6.5 * sc;
-    ctx.fillStyle = "#93a4b5"; ctx.strokeStyle = "rgba(70,100,130,0.6)";
+    // 톱니 절단바퀴(연한 파랑 + 별 중심)
+    const gr = 4 * sc, teeth = 8, gx = -4.5 * sc, gyy = -5 * sc;
+    ctx.fillStyle = "#a9e0ff"; ctx.strokeStyle = "rgba(70,130,180,0.5)"; ctx.lineWidth = Math.max(1, sc * 0.7);
     ctx.beginPath();
     for (let i = 0; i <= teeth * 2; i++) {
-      const a = i / (teeth * 2) * Math.PI * 2, rr = (i % 2 ? gr * 0.58 : gr);
-      const px = Math.cos(a) * rr, py = gyy + Math.sin(a) * rr;
+      const a = i / (teeth * 2) * Math.PI * 2, rr = (i % 2 ? gr * 0.62 : gr);
+      const px = gx + Math.cos(a) * rr, py = gyy + Math.sin(a) * rr;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#5f7080"; ctx.beginPath(); ctx.arc(0, gyy, gr * 0.34, 0, Math.PI * 2); ctx.fill();
+    oSparkle(gx, gyy, 1.7 * sc, "#ffffff");
 
-    // 나비 돌림 노브(오른쪽)
-    ctx.fillStyle = "#c3cdd7"; ctx.strokeStyle = "rgba(90,120,150,0.55)"; ctx.lineWidth = Math.max(1, sc * 0.8);
-    ctx.beginPath(); ctx.ellipse(8.5 * sc, -1 * sc, 3.2 * sc, 1.8 * sc, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(8.5 * sc, -1 * sc, 3.2 * sc, 1.8 * sc, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#7f8c99"; ctx.beginPath(); ctx.arc(8.5 * sc, -1 * sc, 1.2 * sc, 0, Math.PI * 2); ctx.fill();
+    // 나비 돌림 노브(금색 둥근 날개)
+    ctx.fillStyle = "#ffd24a"; ctx.strokeStyle = "#d9a420"; ctx.lineWidth = Math.max(1, sc * 0.8);
+    ctx.beginPath(); ctx.ellipse(7.8 * sc, -3.6 * sc, 3.2 * sc, 2 * sc, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(7.8 * sc, 0.4 * sc, 3.2 * sc, 2 * sc, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff3c0"; ctx.beginPath(); ctx.arc(7.8 * sc, -1.6 * sc, 1.1 * sc, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
+
+    // 반짝임
+    oSparkle(x + 10 * sc, cy - 9 * sc, 1.8 * sc, "rgba(255,255,255,0.9)");
+    oSparkle(x - 9 * sc, cy + 3 * sc, 1.1 * sc, "rgba(255,255,255,0.7)");
   }
 
   // 상단 통조림 보관함
