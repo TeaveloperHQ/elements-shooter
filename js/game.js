@@ -80,6 +80,7 @@
   let decorTimer = 0;
   let lastStage = 0;        // 스테이지(약 4000거리마다 명물이 바뀜)
   let lastCanyonStage = -1; // 거대 협곡을 스폰한 스테이지(끝자락에 1번)
+  let bannerT = 0, bannerText = "", bannerStage = 0;   // 스테이지 도착 배너
   let stored = [];          // 상단에 모은 정어리 통조림
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
@@ -145,7 +146,7 @@
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1;
+    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1; bannerT = 0;
     updateHUD();
   }
 
@@ -296,6 +297,7 @@
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     if (player.stun > 0) player.stun -= dt;
     if (player.tumble > 0) player.tumble -= dt;
+    if (bannerT > 0) bannerT -= dt;
 
     // 이동(스턴 중엔 둔해짐)
     const mv = (player.stun > 0 ? 300 : 560);
@@ -335,7 +337,7 @@
       lastStage = st;
       if (st < STAGES.length) {
         const s = STAGES[st];
-        showToast("🗺 스테이지 " + (st + 1) + " — " + s.icon + " " + s.name + " 도착!", false);
+        bannerT = 2.5; bannerStage = st + 1; bannerText = s.icon + " " + s.name;
         SND.base();
       }
     }
@@ -582,7 +584,34 @@
 
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
-    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawEnergyGauge(); }
+    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawEnergyGauge(); drawStageBanner(); }
+  }
+
+  // 스테이지 도착 배너(슬라이드 인 → 유지 → 페이드 아웃)
+  function drawStageBanner() {
+    if (state !== STATE.PLAY || bannerT <= 0) return;
+    const T = 2.5;
+    let off = 0, alpha = 1;
+    if (bannerT > T - 0.4) off = (1 - (T - bannerT) / 0.4) * W * 0.6;   // 슬라이드 인
+    else if (bannerT < 0.6) { alpha = bannerT / 0.6; off = (1 - bannerT / 0.6) * W * 0.5; }
+    const cy = H * 0.32, bw = W * 0.84, bh = 58, bx = W / 2 - bw / 2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(off, 0);
+    const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    grad.addColorStop(0, "rgba(14,48,86,0)"); grad.addColorStop(0.16, "rgba(14,48,86,0.94)");
+    grad.addColorStop(0.84, "rgba(14,48,86,0.94)"); grad.addColorStop(1, "rgba(14,48,86,0)");
+    ctx.fillStyle = grad; ctx.fillRect(bx, cy - bh / 2, bw, bh);
+    ctx.strokeStyle = "rgba(255,212,120,0.85)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(bx + bw * 0.1, cy - bh / 2); ctx.lineTo(bx + bw * 0.9, cy - bh / 2);
+    ctx.moveTo(bx + bw * 0.1, cy + bh / 2); ctx.lineTo(bx + bw * 0.9, cy + bh / 2); ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffe08a"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText("STAGE " + bannerStage, W / 2, cy - 9);
+    ctx.fillStyle = "#ffffff"; ctx.font = "bold 23px sans-serif";
+    ctx.fillText(bannerText, W / 2, cy + 17);
+    ctx.textAlign = "start";
+    ctx.restore();
   }
 
   // 에너지/배고픔 게이지 — 통조림을 먹으면 차고, 점프·비행·시간으로 줄어든다
@@ -1449,6 +1478,7 @@
     player.energy = 72;
     const m = location.search.match(/stage=(\d+)/);
     if (m) distance = (+m[1]) * STAGE_LEN + 100;   // 색감 확인용 스테이지 강제
+    if (location.search.indexOf("banner") >= 0) { const s = stageLandmark(); bannerT = 1.4; bannerStage = stageIndex() + 1; bannerText = s.icon + " " + s.name; }
     items = [
       { type: "can", el: BUFF_ELEMENTS[0], lane: -0.55, p: 0.42, vp: 0, done: false, wave: 0.5 },
       { type: "can", el: BUFF_ELEMENTS[2], lane: 0.55, p: 0.30, vp: 0, done: false, wave: 2.0 },
