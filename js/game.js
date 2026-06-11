@@ -854,6 +854,11 @@
     ctx.lineJoin = "round";
     ctx.strokeStyle = "rgba(120,160,195,0.6)";
     ctx.lineWidth = Math.max(1, s);
+    // 발밑 눈더미(접지감)
+    ctx.fillStyle = "rgba(238,247,253,0.96)";
+    ctx.beginPath(); ctx.ellipse(0, 0, u * 2.7, u * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(150,190,220,0.25)";
+    ctx.beginPath(); ctx.ellipse(0, u * 0.18, u * 2.7, u * 0.32, 0, 0, Math.PI); ctx.fill();
     if (key === "eiffel") lmEiffel(u);
     else if (key === "pyramid") lmPyramid(u);
     else if (key === "liberty") lmLiberty(u);
@@ -875,21 +880,41 @@
     ctx.moveTo(-2 * u, 0); ctx.lineTo(-0.9 * u, -2.4 * u); ctx.lineTo(-0.35 * u, -4.8 * u); ctx.lineTo(-0.12 * u, -7 * u);
     ctx.lineTo(0.12 * u, -7 * u); ctx.lineTo(0.35 * u, -4.8 * u); ctx.lineTo(0.9 * u, -2.4 * u); ctx.lineTo(2 * u, 0);
     ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    // 철골 격자(대각선)
+    ctx.save();
+    ctx.strokeStyle = "rgba(110,150,190,0.45)"; ctx.lineWidth = Math.max(0.6, u * 0.05);
+    for (let k = 0; k < 5; k++) {
+      const y0 = -k * 1.4 * u, y1 = -(k + 1) * 1.4 * u;
+      const w0 = (2 - k * 0.38) * u, w1 = (2 - (k + 1) * 0.38) * u;
+      if (y1 < -7 * u) break;
+      ctx.beginPath(); ctx.moveTo(-w0, y0); ctx.lineTo(w1, y1); ctx.moveTo(w0, y0); ctx.lineTo(-w1, y1); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fillRect(-1.4 * u, -2.5 * u, 2.8 * u, 0.35 * u);
     ctx.fillRect(-0.8 * u, -4.9 * u, 1.6 * u, 0.3 * u);
     // 아치
     ctx.fillStyle = "rgba(70,110,150,0.35)";
     ctx.beginPath(); ctx.moveTo(-1.1 * u, 0); ctx.quadraticCurveTo(0, -1.8 * u, 1.1 * u, 0); ctx.closePath(); ctx.fill();
+    // 꼭대기 반짝
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(0, -7 * u, u * 0.18, 0, Math.PI * 2); ctx.fill();
   }
   function lmPyramid(u) {
+    // 왼면(밝음) + 오른면(그늘)으로 입체
     ctx.fillStyle = iceGrad(-u * 5.5);
-    ctx.beginPath(); ctx.moveTo(-3.2 * u, 0); ctx.lineTo(0, -5.5 * u); ctx.lineTo(3.2 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-3.2 * u, 0); ctx.lineTo(0, -5.5 * u); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(120,158,192,0.6)";
+    ctx.beginPath(); ctx.moveTo(0, -5.5 * u); ctx.lineTo(3.2 * u, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(120,160,195,0.6)";
+    ctx.beginPath(); ctx.moveTo(-3.2 * u, 0); ctx.lineTo(0, -5.5 * u); ctx.lineTo(3.2 * u, 0); ctx.closePath(); ctx.stroke();
     // 블록 라인
-    ctx.strokeStyle = "rgba(120,160,195,0.4)";
+    ctx.strokeStyle = "rgba(110,150,190,0.35)";
     ctx.beginPath();
     for (let k = 1; k < 5; k++) { const yy = -k * u; const hw = 3.2 * u * (1 - k / 5.5); ctx.moveTo(-hw, yy); ctx.lineTo(hw, yy); }
     ctx.stroke();
+    // 능선 하이라이트
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = Math.max(1, u * 0.08);
+    ctx.beginPath(); ctx.moveTo(0, -5.5 * u); ctx.lineTo(0, 0); ctx.stroke();
     // 작은 피라미드
     ctx.fillStyle = iceGrad(-u * 3);
     ctx.beginPath(); ctx.moveTo(2.4 * u, 0); ctx.lineTo(3.6 * u, -3 * u); ctx.lineTo(4.8 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
