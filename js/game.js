@@ -128,17 +128,19 @@
   function upgradeCost(kind) { return UP_BASE[kind] * (META.up[kind] + 1); }
 
   // ===================== 새 게임 =====================
+  const MAX_ENERGY = 100, HOP_COST = 12, FLY_DRAIN = 24, HUNGER = 3;
   function newGame() {
     player = {
       x: W / 2, targetX: W / 2, y: 0,
       run: 0,                              // 달리기 위상
       jumpY: 0, vz: 0, onGround: true,
-      jumpV: 540 + META.up.jump * 45,      // 점프력(업그레이드 + 통조림 개봉으로 증가)
-      baseJumpV: 540 + META.up.jump * 45,  // 기준 점프력(이보다 크면 '난다')
+      jumpV: 540 + META.up.jump * 45,      // 점프(hop) 속도(업그레이드로 강화)
       flapT: 0,                            // 날갯짓 위상
-      lives: 1 + META.up.life,             // 기본 1 — 크레바스에 빠지면 게임 오버
+      energy: 45,                          // 에너지/배고픔 — 점프·비행에 필요
+      lives: 1 + META.up.life,
       stun: 0,
     };
+    holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
     spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0;
@@ -146,29 +148,41 @@
   }
 
   // ===================== 입력 =====================
-  let keyLeft = false, keyRight = false;
+  let keyLeft = false, keyRight = false, holdJump = false, hungryToast = 0;
   function pointerMove(clientX) { const r = canvas.getBoundingClientRect(); player.targetX = clientX - r.left; }
-  function jump() {
-    if (state !== STATE.PLAY || !player.onGround) return;
-    player.vz = player.jumpV; player.onGround = false; SND.jump();
+  function press() {   // 점프(에너지 있어야 가능)
+    if (state !== STATE.PLAY) return;
+    if (player.onGround) {
+      if (player.energy >= HOP_COST) {
+        player.vz = player.jumpV; player.onGround = false; player.energy -= HOP_COST; SND.jump();
+      } else if (hungryToast <= 0) {
+        hungryToast = 1.2;
+        spawnText(player.x, playerLineY() - 40, "배고파요! 🥫", "#ffcf9a", 18);
+        SND.bad();
+      }
+    }
   }
   canvas.addEventListener("mousemove", function (e) { if (state === STATE.PLAY) pointerMove(e.clientX); });
-  canvas.addEventListener("mousedown", function () { jump(); });
+  canvas.addEventListener("mousedown", function () { holdJump = true; press(); });
+  window.addEventListener("mouseup", function () { holdJump = false; });
   canvas.addEventListener("touchmove", function (e) {
     if (state === STATE.PLAY && e.touches[0]) { pointerMove(e.touches[0].clientX); e.preventDefault(); }
   }, { passive: false });
   canvas.addEventListener("touchstart", function (e) {
     if (state === STATE.PLAY && e.touches[0]) pointerMove(e.touches[0].clientX);
-    jump();
+    holdJump = true; press();
   });
+  canvas.addEventListener("touchend", function () { holdJump = false; });
+  canvas.addEventListener("touchcancel", function () { holdJump = false; });
   window.addEventListener("keydown", function (e) {
     if (e.key === "ArrowLeft") keyLeft = true;
     if (e.key === "ArrowRight") keyRight = true;
-    if (e.key === " " || e.key === "ArrowUp" || e.key === "Spacebar") { jump(); e.preventDefault(); }
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "Spacebar") { holdJump = true; press(); e.preventDefault(); }
   });
   window.addEventListener("keyup", function (e) {
     if (e.key === "ArrowLeft") keyLeft = false;
     if (e.key === "ArrowRight") keyRight = false;
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "Spacebar") holdJump = false;
   });
 
   // ===================== 화면 전환 =====================
@@ -231,10 +245,17 @@
   function spawnObstacle() {
     const r = Math.random();
     if (r < 0.35) {
-      // 얼음 크레바스 — 크기 1/3 ~ 2/3, 랜덤 갈라진 모양
-      const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;   // -0.4 / 0 / 0.4
-      const w = (1 / 3) + Math.random() * (1 / 3);
-      items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, w: w, shape: makeJagged() });
+      const big = Math.random() < 0.3;
+      if (big) {
+        // 거대 크레바스 — 길을 가로지름. 점프로는 못 넘고, 에너지 모아 날아서 건너야 함
+        items.push({ type: "hole", lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
+          w: 0.95 + Math.random() * 0.2, len: 0.24 + Math.random() * 0.14, shape: makeJagged() });
+      } else {
+        // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능
+        const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
+        items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, cleared: false,
+          w: (1 / 3) + Math.random() * (1 / 3), len: 0.03, shape: makeJagged() });
+      }
     } else if (r < 0.86) {
       // 정어리 통조림 (겉면에 원소 기호)
       const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
@@ -282,16 +303,22 @@
     player.y = playerLineY();
     player.run += dt * (5 + speed * 0.02);
 
-    // 점프력은 통조림 개봉으로 오르고, 안 쓰면 서서히 내려간다(증가↔감소)
-    if (player.jumpV > player.baseJumpV) player.jumpV = Math.max(player.baseJumpV, player.jumpV - 5 * dt);
+    if (hungryToast > 0) hungryToast -= dt;
+    // 배고픔: 가만히 있어도 에너지가 서서히 줄어든다(통조림을 먹어야 함)
+    player.energy = Math.max(0, player.energy - HUNGER * dt);
 
-    // 점프 물리 (점프력이 오르면 하강 시 활공 → 더 오래 난다)
-    const flying = player.jumpV > player.baseJumpV + 1;
+    // 점프/비행 물리 — 점프 버튼을 누르고 있고 에너지가 있으면 날갯짓으로 떠 있다
+    const flying = !player.onGround && holdJump && player.energy > 0;
     if (!player.onGround) {
-      player.flapT += dt * 24;             // 날갯짓
+      player.flapT += dt * 24;
+      if (flying) {
+        player.vz += 2000 * dt;                       // 양력(날갯짓)
+        player.vz = Math.min(player.vz, 260);
+        if (player.jumpY > 175) player.vz = Math.min(player.vz, 0);   // 고도 상한
+        player.energy = Math.max(0, player.energy - FLY_DRAIN * dt);  // 비행 연료 소모
+      }
       player.jumpY += player.vz * dt;
-      const grav = (flying && player.vz < 0) ? 1700 * 0.5 : 1700;   // 활공
-      player.vz -= grav * dt;
+      player.vz -= 1700 * dt;                          // 중력
       if (player.jumpY <= 0) { player.jumpY = 0; player.vz = 0; player.onGround = true; }
     }
 
@@ -334,47 +361,47 @@
     for (let i = items.length - 1; i >= 0; i--) {
       const o = items[i];
       o.p += o.vp * (0.5 + o.p * 1.0) * dt;
-      if (o.type === "can" || o.type === "opener") o.wave += dt * 5;
 
-      // 자석: 통조림/따개를 끌어당김
-      if ((o.type === "can" || o.type === "opener") && META.up.magnet > 0 && o.p > 0.6 && player.onGround) {
-        const ox = laneToX(o.p, o.lane);
-        const range = 30 + META.up.magnet * 16;
+      // ----- 크레바스: 길이(len)만큼 플레이어 선을 지나가는 동안 계속 판정 -----
+      if (o.type === "hole") {
+        const frontP = o.p, backP = o.p - o.len;
+        const overLine = backP <= 1 && frontP >= 1;          // 플레이어 선이 구덩이 위
+        if (overLine && player.onGround) {
+          const ox = laneToX(1, o.lane), holeHalf = halfAt(1) * o.w;
+          if (Math.abs(player.x - ox) < holeHalf + 6) {       // 구덩이에 발이 닿음 → 아웃
+            spawnParticles(ox, playerLineY(), "#9ab8d0", 24, 260);
+            spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
+            screenFlash = 0.6; shake = Math.min(24, shake + 18);
+            SND.fall(); updateHUD(); gameOver();
+            return;
+          }
+        }
+        if (!o.cleared && backP > 1) {                        // 무사 통과
+          o.cleared = true;
+          const big = o.len > 0.1;
+          score += big ? 80 : 5; runCoins += big ? 2 : 1;
+          spawnText(player.x, playerLineY() - player.jumpY - 36, big ? "건넜다!" : "점프!", "#aef0c0", big ? 22 : 18);
+        }
+        if (backP > 1.06) items.splice(i, 1);
+        continue;
+      }
+
+      // ----- 통조림 / 따개 -----
+      o.wave += dt * 5;
+      if (META.up.magnet > 0 && o.p > 0.6 && player.onGround) {
+        const ox = laneToX(o.p, o.lane), range = 30 + META.up.magnet * 16;
         if (Math.abs(player.x - ox) < range) {
           o.lane += (((player.x - curveCenterX(o.p)) / halfAt(o.p)) - o.lane) * Math.min(1, dt * 4);
         }
       }
-
       if (!o.done && o.p >= 1) {
         o.done = true;
         const ox = laneToX(1, o.lane);
-        let eaten = false;
-        if (o.type === "hole") hitHole(o, ox, AIR);
-        else if (o.type === "can") eaten = collectCan(o, ox, AIR);
-        else eaten = eatOpener(o, ox, AIR);
-        if (eaten) { items.splice(i, 1); continue; }   // 먹으면 즉시 사라짐
+        const eaten = (o.type === "can") ? collectCan(o, ox, AIR) : eatOpener(o, ox, AIR);
+        if (eaten) { items.splice(i, 1); continue; }
       }
       if (o.p > 1.1) items.splice(i, 1);
     }
-  }
-
-  function hitHole(o, ox, AIR) {
-    const holeHalf = halfAt(1) * o.w;
-    if (player.jumpY > AIR) {
-      // 점프로 넘음
-      score += 5; runCoins += 1;
-      spawnText(player.x, playerLineY() - player.jumpY - 36, "점프!", "#aef0c0", 18);
-      spawnParticles(ox, playerLineY(), "#bfe6ff", 6, 130);
-    } else if (Math.abs(player.x - ox) < holeHalf + 6) {
-      // 크레바스 가운데로 빠짐 → 즉시 아웃
-      spawnParticles(ox, playerLineY(), "#9ab8d0", 22, 260);
-      spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
-      screenFlash = 0.5; shake = Math.min(22, shake + 16);
-      SND.fall();
-      updateHUD();
-      gameOver();
-    }
-    // 옆으로 비켜서 있으면 무사
   }
 
   // 정어리 통조림: 주우면 상단 보관함에 쌓인다. 먹으면 true 반환(즉시 제거).
@@ -385,6 +412,7 @@
     learned[el.symbol] = true;
     stored.push({ symbol: el.symbol, name: el.name, color: el.color });
     score += 30; runCoins += 1;
+    player.energy = Math.min(MAX_ENERGY, player.energy + 10);   // 살짝 충전
     spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
     spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
     SND.flag();
@@ -411,19 +439,19 @@
       showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
       return true;
     }
-    // 통조림 하나 개봉(가장 최근 것)
+    // 통조림 하나 개봉(가장 최근 것) → 정어리를 먹어 에너지 충전
     const slotX = storedSlotX(stored.length - 1);
     const c = stored.pop();
     learned[c.symbol] = true;
     score += 200; runCoins += 2;
-    player.jumpV = Math.min(880, player.jumpV + 16);   // 일치할 때마다 점프력(나는 능력) ↑
+    player.energy = Math.min(MAX_ENERGY, player.energy + 34);   // 정어리 식사 → 에너지 ↑
     spawnText(slotX, 99, "🐟", "#bcd6e8", 22);
     spawnParticles(slotX, 99, "#cfe6f5", 12, 190);
-    spawnText(player.x, playerLineY() - 64, c.name + " 개봉! +200", "#ffe678", 22);
-    spawnText(player.x, playerLineY() - 90, "🪶 점프력 ↑", "#aef0c0", 16);
+    spawnText(player.x, playerLineY() - 64, c.name + " 냠냠! +200", "#ffe678", 22);
+    spawnText(player.x, playerLineY() - 90, "🍴 에너지 ↑", "#aef0c0", 16);
     shake = Math.min(12, shake + 6);
     SND.base();
-    showToast(c.symbol + " = " + c.name + " 통조림 개봉! 정어리 +200 · 점프력 ↑", false);
+    showToast(c.symbol + " = " + c.name + " 통조림 개봉! 정어리 +200 · 에너지 ↑", false);
     updateHUD();
     return true;
   }
@@ -499,29 +527,30 @@
 
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
-    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawJumpGauge(); }
+    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawEnergyGauge(); }
   }
 
-  // 점프력 게이지(현재 나는 능력) — 통조림 개봉으로 차오르고 안 쓰면 줄어든다
-  function drawJumpGauge() {
+  // 에너지/배고픔 게이지 — 통조림을 먹으면 차고, 점프·비행·시간으로 줄어든다
+  function drawEnergyGauge() {
     if (state !== STATE.PLAY) return;
-    const baseV = player.baseJumpV, maxV = 880;
-    const frac = Math.max(0, Math.min(1, (player.jumpV - baseV) / (maxV - baseV)));
-    const gx = 16, gw = 13, gh = 92, gy = H - 138;
+    const frac = Math.max(0, Math.min(1, player.energy / MAX_ENERGY));
+    const gx = 16, gw = 13, gh = 96, gy = H - 142;
+    const low = frac < 0.18;
     ctx.fillStyle = "rgba(10,24,40,0.5)"; ctx.fillRect(gx - 4, gy - 18, gw + 8, gh + 34);
     ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(gx, gy, gw, gh);
     const fh = gh * frac;
-    if (frac > 0.02) {
+    if (frac > 0.01) {
       const grad = ctx.createLinearGradient(0, gy + gh, 0, gy);
-      grad.addColorStop(0, "#6fe0a0"); grad.addColorStop(1, "#aef0c0");
+      if (low) { grad.addColorStop(0, "#ff6b6b"); grad.addColorStop(1, "#ffb070"); }
+      else { grad.addColorStop(0, "#6fe0a0"); grad.addColorStop(0.6, "#9fe6ff"); grad.addColorStop(1, "#aef0c0"); }
       ctx.fillStyle = grad; ctx.fillRect(gx, gy + gh - fh, gw, fh);
     }
     ctx.strokeStyle = "rgba(150,200,180,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(gx, gy, gw, gh);
-    ctx.textAlign = "center"; ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 13px sans-serif";
-    ctx.fillText("🪶", gx + gw / 2, gy - 5);
-    ctx.fillStyle = frac > 0.02 ? "#aef0c0" : "rgba(200,220,240,0.5)";
-    ctx.font = "bold 9px sans-serif";
-    ctx.fillText(frac > 0.02 ? "비행" : "걷기", gx + gw / 2, gy + gh + 12);
+    ctx.textAlign = "center"; ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = low && (Math.sin(elapsed * 8) > 0) ? "#ff8a8a" : "#cfe6ff";
+    ctx.fillText(low ? "🍴" : "⚡", gx + gw / 2, gy - 5);
+    ctx.fillStyle = low ? "#ff8a8a" : "#aef0c0"; ctx.font = "bold 9px sans-serif";
+    ctx.fillText(low ? "배고픔" : (frac > 0.5 ? "비행OK" : "에너지"), gx + gw / 2, gy + gh + 12);
     ctx.textAlign = "start";
   }
 
@@ -900,30 +929,42 @@
   }
 
   function drawHole(o) {
-    const sc = projScale(o.p), y = projY(o.p);
-    const cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * o.w, ry = rx * 0.22;   // 넓고 납작
-    const shp = o.shape, n = shp.length;
-    function outline() {
-      ctx.beginPath();
-      for (let i = 0; i <= n; i++) {
-        const a = (i % n) / n * Math.PI * 2, rr = shp[i % n];
-        const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-    }
+    const fP = o.p, bP = Math.max(0.02, o.p - o.len);
+    const fy = projY(fP), by = projY(bP);
+    const fcx = laneToX(fP, o.lane), bcx = laneToX(bP, o.lane);
+    const frx = halfAt(fP) * o.w, brx = halfAt(bP) * o.w;
+    const sc = projScale(fP), shp = o.shape, n = shp.length;
+    const big = o.len > 0.1;
+
     ctx.save();
-    const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
-    g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
-    ctx.fillStyle = g; outline(); ctx.fill();
-    ctx.fillStyle = "rgba(180,225,245,0.3)"; ctx.beginPath(); ctx.ellipse(cx - rx * 0.3, y - ry * 0.3, rx * 0.3, ry * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    // 어두운 얼음 밴드(앞↔뒤 사다리꼴)
+    const g = ctx.createLinearGradient(0, by, 0, fy);
+    g.addColorStop(0, "#3f86ad"); g.addColorStop(0.5, "#19567a"); g.addColorStop(1, "#0e3550");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(fcx - frx, fy); ctx.lineTo(fcx + frx, fy);
+    ctx.lineTo(bcx + brx, by); ctx.lineTo(bcx - brx, by);
+    ctx.closePath(); ctx.fill();
+    // 안쪽 반짝
+    ctx.fillStyle = "rgba(180,225,245,0.22)";
+    ctx.beginPath(); ctx.ellipse((fcx + bcx) / 2 - frx * 0.25, (fy + by) / 2, frx * 0.3, Math.max(2, (fy - by) * 0.18), 0, 0, Math.PI * 2); ctx.fill();
+    // 앞 가장자리 들쭉날쭉 얼음 테
     ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
-    outline(); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const t = i / n; const xx = (fcx - frx) + 2 * frx * t; const j = (shp[i % n] - 0.85) * 6 * sc; if (i === 0) ctx.moveTo(xx, fy + j); else ctx.lineTo(xx, fy + j); }
+    ctx.stroke();
+    // 뒤 가장자리
+    ctx.strokeStyle = "rgba(180,215,240,0.6)"; ctx.lineWidth = Math.max(1, 1.6 * sc);
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const t = i / n; const xx = (bcx - brx) + 2 * brx * t; const j = (shp[(i + 3) % n] - 0.85) * 5 * sc; if (i === 0) ctx.moveTo(xx, by + j); else ctx.lineTo(xx, by + j); }
+    ctx.stroke();
     ctx.restore();
-    // 점프 안내
-    ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
-    ctx.font = "bold " + (9 * sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", cx, y - ry - 8 * sc);
+
+    // 안내(거대 크레바스는 비행 필요)
+    ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center";
+    ctx.fillStyle = big ? "#ffd07a" : "#cfe6ff";
+    ctx.font = "bold " + (big ? 11 * sc + 6 : 9 * sc + 6) + "px sans-serif";
+    ctx.fillText(big ? "🪽 날아서 건너기!" : "⬆ 점프", fcx, fy - 7 * sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
@@ -1048,7 +1089,7 @@
     const shS = 1 - Math.min(0.55, lift / 150);
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
-    const flying = !player.onGround && player.jumpV > player.baseJumpV + 1;
+    const flying = !player.onGround && holdJump && player.energy > 0;
     drawPenguin(x, y - lift, 1.7, player.run, player.stun > 0, flying, player.flapT);
   }
 
