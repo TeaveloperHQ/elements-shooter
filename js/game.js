@@ -1189,7 +1189,13 @@
     ctx.fillStyle = "#2f8fe0"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.5);
     ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.08);
     ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (ch * 0.42) + "px sans-serif";
-    ctx.fillText(o.el.symbol, x, top + ch * 0.62);
+    ctx.fillText(o.el.symbol, x, top + ch * 0.6);
+    // 라벨 아래 작은 정어리 그림
+    const fy = top + ch * 0.9, fl = cw * 0.16;
+    ctx.fillStyle = "#bcd6e8";
+    ctx.beginPath(); ctx.ellipse(x - cw * 0.04, fy, fl, ch * 0.085, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + cw * 0.1, fy); ctx.lineTo(x + cw * 0.21, fy - ch * 0.06); ctx.lineTo(x + cw * 0.21, fy + ch * 0.06); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#10202b"; ctx.beginPath(); ctx.arc(x - cw * 0.15, fy - ch * 0.01, ch * 0.025, 0, Math.PI * 2); ctx.fill();
     // 뚜껑(타원) + 림
     ctx.fillStyle = "#eef4fa"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = Math.max(1, sc);
     ctx.beginPath(); ctx.ellipse(x, top, cw / 2, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -1307,10 +1313,12 @@
     ctx.fillStyle = "rgba(40,80,120," + (0.24 * shS) + ")";
     ctx.beginPath(); ctx.ellipse(x, y + 7, 16 * shS, 5 * shS, 0, 0, Math.PI * 2); ctx.fill();
     const flying = !player.onGround && holdJump && player.energy > 0;
-    drawPenguin(x, y - lift, 2.0, player.run, player.stun > 0, flying, player.flapT, player.tumble);
+    const air = !player.onGround;
+    const stretch = air ? Math.max(0.9, Math.min(1.13, 1 + player.vz / 1700)) : 1;
+    drawPenguin(x, y - lift, 2.0, player.run, player.stun > 0, flying, player.flapT, player.tumble, air, stretch);
   }
 
-  function drawPenguin(x, y, s, phase, stun, fly, flapPhase, tumble) {
+  function drawPenguin(x, y, s, phase, stun, fly, flapPhase, tumble, air, stretch) {
     const fall = (tumble && tumble > 0) ? Math.min(1, tumble / 0.6) : 0;
     let wad = Math.sin(phase) * 0.07;
     if (fall > 0) wad = -0.75 * fall + Math.sin(tumble * 26) * 0.12 * fall;   // 앞으로 휘청
@@ -1324,11 +1332,11 @@
     ctx.translate(x, y + fall * 5);
     if (stun && fall <= 0) ctx.globalAlpha = 0.45 + 0.4 * Math.sin(phase * 5);
     ctx.rotate(wad);
-    ctx.scale(s, s);
+    ctx.scale(s, s * (stretch || 1));
 
-    // 발(번갈아 — 날 땐 모음)
+    // 발(번갈아 — 공중에선 모음)
     ctx.fillStyle = "#f5a623"; ctx.strokeStyle = "#c87f12"; ctx.lineWidth = 0.8;
-    const fl = fly ? 0 : stepL, fr = fly ? 0 : stepR;
+    const fl = (fly || air) ? -1 : stepL, fr = (fly || air) ? -1 : stepR;
     ctx.beginPath(); ctx.ellipse(-4, 5 - fl, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(4, 5 - fr, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // 꼬리
