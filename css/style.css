@@ -96,9 +96,11 @@ canvas#game {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   text-align: center;
-  padding: 24px;
+  padding: 18px 22px;
+  gap: 2px;
+  overflow-y: auto;
   background: radial-gradient(circle at 50% 26%, rgba(36, 104, 158, 0.72), rgba(7, 20, 36, 0.93));
   z-index: 10;
 }
@@ -108,16 +110,16 @@ canvas#game {
 }
 
 .overlay h1 {
-  font-size: 40px;
-  margin-bottom: 4px;
+  font-size: 32px;
+  margin: 6px 0 2px;
   text-shadow: 0 0 20px rgba(110, 200, 255, 0.5);
 }
 
 .subtitle {
-  font-size: 15px;
+  font-size: 13px;
   letter-spacing: 4px;
   color: #6fd3ff;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
   text-transform: uppercase;
 }
 
