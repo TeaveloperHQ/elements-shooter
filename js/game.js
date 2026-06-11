@@ -341,9 +341,11 @@
       if (!o.done && o.p >= 1) {
         o.done = true;
         const ox = laneToX(1, o.lane);
+        let eaten = false;
         if (o.type === "hole") hitHole(o, ox, AIR);
-        else if (o.type === "can") collectCan(o, ox, AIR);
-        else eatOpener(o, ox, AIR);
+        else if (o.type === "can") eaten = collectCan(o, ox, AIR);
+        else eaten = eatOpener(o, ox, AIR);
+        if (eaten) { items.splice(i, 1); continue; }   // 먹으면 즉시 사라짐
       }
       if (o.p > 1.1) items.splice(i, 1);
     }
@@ -364,20 +366,20 @@
     // 옆으로 비켜서 있으면 무사
   }
 
-  // 정어리 통조림: 주우면 상단 보관함에 쌓인다
+  // 정어리 통조림: 주우면 상단 보관함에 쌓인다. 먹으면 true 반환(즉시 제거).
   function collectCan(o, ox, AIR) {
     const el = o.el;
     const catchR = 36 + META.up.magnet * 8;
-    if (player.jumpY <= AIR && Math.abs(player.x - ox) < catchR) {
-      learned[el.symbol] = true;
-      stored.push({ symbol: el.symbol, name: el.name, color: el.color });
-      score += 30; runCoins += 1;
-      spawnParticles(ox, playerLineY() - 20, el.color, 10, 150);
-      spawnText(player.x, playerLineY() - 56, "🥫 " + el.symbol, "#cfe6ff", 18);
-      SND.flag();
-      showToast(el.symbol + " " + el.name + " 통조림 획득! (위에 모임)", false);
-      updateHUD();
-    }
+    if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return false;
+    learned[el.symbol] = true;
+    stored.push({ symbol: el.symbol, name: el.name, color: el.color });
+    score += 30; runCoins += 1;
+    spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
+    spawnText(player.x, playerLineY() - 56, "🥫 " + el.symbol, "#cfe6ff", 18);
+    SND.flag();
+    showToast(el.symbol + " " + el.name + " 통조림 획득! (위에 모임)", false);
+    updateHUD();
+    return true;
   }
 
   // 상단 보관함에서 i번째 통조림의 화면 X
@@ -391,21 +393,21 @@
   // 통조림 따개: 따개와 "같은 원소" 통조림이 있어야 그 통조림이 열린다.
   function eatOpener(o, ox, AIR) {
     const catchR = 34 + META.up.magnet * 6;
-    if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return;
+    if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return false;
     learned[o.el.symbol] = true;
 
     if (stored.length === 0) {
       spawnText(player.x, playerLineY() - 56, "통조림이 없어요!", "#ffcf9a", 16);
       SND.bad();
       showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
-      return;
+      return true;
     }
     const idx = stored.findIndex(function (c) { return c.symbol === o.el.symbol; });
     if (idx === -1) {
       spawnText(player.x, playerLineY() - 56, o.el.symbol + " 통조림 없음!", "#ffcf9a", 16);
       SND.bad();
       showToast("⚠ " + o.el.symbol + " " + o.el.name + " 따개 — 일치하는 통조림이 위에 없어요!", true);
-      return;
+      return true;
     }
     // 일치 → 그 통조림만 개봉
     const slotX = storedSlotX(idx);
@@ -418,6 +420,7 @@
     SND.base();
     showToast("🥫 " + c.symbol + " " + c.name + " — 따개와 일치! 정어리 +200", false);
     updateHUD();
+    return true;
   }
 
   function loseLife(msg) {
