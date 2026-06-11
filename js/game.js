@@ -40,10 +40,23 @@
 
   function projY(p) { return horizonY() + (playerLineY() - horizonY()) * p; }
   function projScale(p) { return 0.28 + 1.0 * p; }            // 멀면 작게
-  function laneToX(p, lane) {
-    return W / 2 + lane * (roadHalfTop() + (roadHalfBot() - roadHalfTop()) * p);
-  }
+  function halfAt(p) { return roadHalfTop() + (roadHalfBot() - roadHalfTop()) * p; }
+  function laneToX(p, lane) { return W / 2 + lane * halfAt(p); }
   function xToLane(x) { return (x - W / 2) / roadHalfBot(); }  // 바닥(p=1) 기준
+
+  // 게이트 한 칸(좌/우)의 사다리꼴 화면 좌표
+  function panelGeom(pr, side) {
+    const pBot = pr.p;
+    const pTop = Math.max(0, pr.p - 0.14);
+    const vx = W / 2;
+    const bh = halfAt(pBot), th = halfAt(pTop);
+    const by = projY(pBot), ty = projY(pTop);
+    let x0, x1, xt0, xt1;
+    if (side < 0) { x0 = vx - bh; x1 = vx; xt0 = vx - th; xt1 = vx; }
+    else { x0 = vx; x1 = vx + bh; xt0 = vx; xt1 = vx + th; }
+    return { by: by, ty: ty, x0: x0, x1: x1, xt0: xt0, xt1: xt1,
+             cx: (x0 + x1) / 2, cy: (by + ty) / 2, scale: projScale(pBot) };
+  }
 
   // ===================== 게임 상태 =====================
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
@@ -147,28 +160,41 @@
   }
 
   // ===================== 게이트 =====================
-  // 좌우 한 쌍(한쪽은 안전 원소, 한쪽은 위험 원소)을 랜덤 배치해서 내려보낸다.
+  // 좌우 한 쌍(한쪽은 안전 원소, 한쪽은 위험 원소)이 지평선에서 길을 막는 벽처럼
+  // 원근으로 다가온다. 쏘면 숫자가 커지고, 안전 게이트를 목표치까지 채우면 폭발 + 아이템.
   function spawnGatePair() {
     const buff = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
     const trap = TRAP_ELEMENTS[(Math.random() * TRAP_ELEMENTS.length) | 0];
-    const margin = 12;
-    const gw = (W - margin * 3) / 2;
     const leftIsBuff = Math.random() < 0.5;
-    gates.push([
-      makeGate(margin, gw, leftIsBuff ? buff : trap),
-      makeGate(margin * 2 + gw, gw, leftIsBuff ? trap : buff),
-    ]);
+    gates.push({
+      p: 0.0,
+      vp: 0.085 + Math.random() * 0.02,
+      applied: false,
+      panels: [
+        makePanel(-1, leftIsBuff ? buff : trap),
+        makePanel(+1, leftIsBuff ? trap : buff),
+      ],
+    });
   }
-  function makeGate(x, w, el) {
+  function makePanel(side, el) {
     const buff = el.kind === "buff";
-    // 시작 숫자: 안전 +(2~6), 위험 −(2~6). 쏠수록 절댓값이 커진다.
-    const base = 2 + ((Math.random() * 5) | 0);
+    const base = 2 + ((Math.random() * 5) | 0);   // 시작 숫자 ±(2~6)
     return {
-      x: x, w: w, y: -64, h: 60, el: el,
+      side: side, el: el,
       count: buff ? base : -base,
-      goal: 12,            // 안전 게이트를 이만큼 채우면 보너스 아이템
-      applied: false, jackpot: false,
+      goal: 10,            // 안전 게이트를 이만큼 채우면 폭발 + 아이템
+      bursted: false,
     };
+  }
+  function burstPanel(pr, panel) {
+    panel.bursted = true;
+    const g = panelGeom(pr, panel.side);
+    spawnParticles(g.cx, g.cy, panel.el.color, 24, 240);
+    spawnParticles(g.cx, g.cy, "#ffffff", 14, 280);
+    spawnItem(g.cx, g.cy);
+    shake = Math.min(16, shake + 11);
+    learned[panel.el.symbol] = true;
+    showToast("💥 " + panel.el.symbol + " " + panel.el.name + " 폭발! 아이템 획득!", false);
   }
 
   // ===================== 업데이트 =====================
@@ -248,14 +274,27 @@
       const by = projY(b.p);
       let hit = false;
 
-      // 게이트(화면 좌표 패널) 충돌 → 숫자 키우기
-      for (const pair of gates) {
-        for (const g of pair) {
-          if (!g.applied && bx >= g.x && bx <= g.x + g.w && by <= g.y + g.h && by >= g.y) {
-            if (g.el.kind === "buff") g.count = Math.min(30, g.count + 1);
-            else g.count = Math.max(-30, g.count - 1);
-            spawnParticles(bx, by, g.el.color, 4, 90);
-            hit = true; break;
+      // 게이트(원근 벽) 충돌 → 숫자 키우기 / 폭발
+      for (const pr of gates) {
+        if (pr.applied) continue;
+        const gBot = projY(pr.p), gTop = projY(Math.max(0, pr.p - 0.14));
+        if (by <= gBot && by >= gTop) {
+          const half = halfAt(pr.p), vx = W / 2;
+          let side = 0;
+          if (bx >= vx - half && bx < vx) side = -1;
+          else if (bx > vx && bx <= vx + half) side = 1;
+          if (side !== 0) {
+            const panel = pr.panels[0].side === side ? pr.panels[0] : pr.panels[1];
+            if (!panel.bursted) {
+              if (panel.el.kind === "buff") {
+                panel.count = Math.min(40, panel.count + 1);
+                if (panel.count >= panel.goal) burstPanel(pr, panel);
+              } else {
+                panel.count = Math.max(-40, panel.count - 1);
+              }
+              spawnParticles(bx, by, panel.el.color, 4, 90);
+              hit = true;
+            }
           }
         }
         if (hit) break;
@@ -309,24 +348,23 @@
   }
 
   function updateGates(dt) {
-    const line = playerLineY();
-    for (let p = gates.length - 1; p >= 0; p--) {
-      const pair = gates[p];
-      for (const g of pair) {
-        g.y += 46 * dt;
-        if (!g.applied && g.y + g.h >= line) {
-          g.applied = true;
-          if (player.x >= g.x && player.x <= g.x + g.w) applyGate(g);
-        }
+    for (let i = gates.length - 1; i >= 0; i--) {
+      const pr = gates[i];
+      pr.p += pr.vp * (0.45 + pr.p * 1.0) * dt;   // 가까울수록 빠르게
+      if (!pr.applied && pr.p >= 1) {
+        pr.applied = true;
+        const side = player.x < W / 2 ? -1 : 1;
+        const panel = pr.panels[0].side === side ? pr.panels[0] : pr.panels[1];
+        if (!panel.bursted) applyGate(panel);
       }
-      if (pair[0].y > H && pair[1].y > H) gates.splice(p, 1);
+      if (pr.p > 1.08) gates.splice(i, 1);
     }
   }
 
-  function applyGate(g) {
-    const el = g.el;
+  function applyGate(panel) {
+    const el = panel.el;
     const sign = el.kind === "buff" ? 1 : -1;
-    const n = Math.abs(g.count);
+    const n = Math.abs(panel.count);
     learned[el.symbol] = true;
 
     switch (el.effect) {
@@ -344,14 +382,7 @@
       case "score":    score += sign * n * 300; break;
     }
 
-    // 안전 게이트를 충분히 채웠으면 보너스 아이템
-    if (el.kind === "buff" && g.count >= g.goal) {
-      spawnItem(player.x, playerLineY() - 40);
-      showToast("🎁 " + el.symbol + " " + el.name + " 풀충전! 보너스 아이템 획득!", false);
-    } else {
-      showToast(el.symbol + " " + el.name + " — " + el.fact, el.kind === "trap");
-    }
-
+    showToast(el.symbol + " " + el.name + " — " + el.fact, el.kind === "trap");
     spawnParticles(player.x, playerLineY() - 10, el.color, 16, 180);
     updateHUD();
     if (player.squad <= 0) gameOver();
@@ -750,39 +781,46 @@
 
   function drawGates() {
     ctx.textAlign = "center";
-    for (const pair of gates) {
-      for (const g of pair) {
-        const isBuff = g.el.kind === "buff";
-        const cx = g.x + g.w / 2;
-        const ready = isBuff && g.count >= g.goal;
+    const sorted = gates.slice().sort(function (a, b) { return a.p - b.p; });  // 먼 것부터
+    for (const pr of sorted) {
+      for (const panel of pr.panels) {
+        if (panel.bursted) continue;
+        const isBuff = panel.el.kind === "buff";
+        const g = panelGeom(pr, panel.side);
 
-        const grad = ctx.createLinearGradient(g.x, g.y, g.x, g.y + g.h);
-        if (isBuff) { grad.addColorStop(0, "rgba(80, 180, 255, 0.32)"); grad.addColorStop(1, "rgba(30, 110, 200, 0.5)"); }
-        else { grad.addColorStop(0, "rgba(255, 120, 120, 0.32)"); grad.addColorStop(1, "rgba(170, 50, 60, 0.5)"); }
+        // 사다리꼴 벽
+        const grad = ctx.createLinearGradient(0, g.ty, 0, g.by);
+        if (isBuff) { grad.addColorStop(0, "rgba(80, 180, 255, 0.30)"); grad.addColorStop(1, "rgba(30, 110, 200, 0.6)"); }
+        else { grad.addColorStop(0, "rgba(255, 120, 120, 0.30)"); grad.addColorStop(1, "rgba(170, 50, 60, 0.6)"); }
         ctx.fillStyle = grad;
-        ctx.fillRect(g.x, g.y, g.w, g.h);
+        ctx.beginPath();
+        ctx.moveTo(g.x0, g.by); ctx.lineTo(g.x1, g.by);
+        ctx.lineTo(g.xt1, g.ty); ctx.lineTo(g.xt0, g.ty);
+        ctx.closePath(); ctx.fill();
 
-        ctx.strokeStyle = ready ? "rgba(255, 230, 120, 1)"
-                                : (isBuff ? "rgba(150, 220, 255, 0.95)" : "rgba(255, 140, 140, 0.95)");
-        ctx.lineWidth = ready ? 3.5 : 2.5;
-        ctx.strokeRect(g.x + 1, g.y + 1, g.w - 2, g.h - 2);
-        ctx.fillStyle = "rgba(255,255,255,0.18)";
-        ctx.fillRect(g.x + 2, g.y + 2, g.w - 4, 8);
+        ctx.strokeStyle = isBuff ? "rgba(150, 220, 255, 0.95)" : "rgba(255, 150, 150, 0.95)";
+        ctx.lineWidth = 2.5; ctx.stroke();
 
-        // 큰 숫자(+N / −N) — 참고 이미지 스타일
+        // 큰 숫자(+N / −N)
+        const fs = Math.max(13, 30 * g.scale);
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 30px sans-serif";
-        const num = (g.count >= 0 ? "+" : "−") + Math.abs(g.count);
-        ctx.fillText(num, cx, g.y + 32);
+        ctx.font = "bold " + fs + "px sans-serif";
+        const num = (panel.count >= 0 ? "+" : "−") + Math.abs(panel.count);
+        ctx.fillText(num, g.cx, g.cy + fs * 0.2);
 
+        // 이름
         ctx.fillStyle = "#eaf6ff";
-        ctx.font = "12px sans-serif";
-        ctx.fillText(g.el.symbol + " " + g.el.name, cx, g.y + 50);
+        ctx.font = Math.max(8, 12 * g.scale) + "px sans-serif";
+        ctx.fillText(panel.el.symbol + " " + panel.el.name, g.cx, g.by - 6 * g.scale);
 
-        if (ready) {
-          ctx.fillStyle = "#ffe678";
-          ctx.font = "bold 11px sans-serif";
-          ctx.fillText("🎁 보너스!", cx, g.y - 4);
+        // 안전 게이트 폭발 게이지
+        if (isBuff) {
+          const prog = Math.min(1, panel.count / panel.goal);
+          const bw = 44 * g.scale, bh = 5 * g.scale, bx = g.cx - bw / 2, byy = g.ty + 4 * g.scale;
+          ctx.fillStyle = "rgba(0,0,0,0.4)";
+          ctx.fillRect(bx, byy, bw, bh);
+          ctx.fillStyle = prog >= 1 ? "#fff09a" : "#ffe678";
+          ctx.fillRect(bx, byy, bw * prog, bh);
         }
       }
     }
