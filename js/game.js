@@ -85,7 +85,7 @@
   let stored = [];          // 상단에 모은 정어리 통조림
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
-  const STAGE_LEN = 3500;
+  const STAGE_LEN = 6800;
   const STAGES = [
     { key: "iceberg",   name: "남극",      icon: "🐧", tint: null },
     { key: "moai",      name: "이스터섬",  icon: "🗿", tint: "rgba(80,200,180,0.12)" },
@@ -143,6 +143,7 @@
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
       stun: 0, tumble: 0,
+      falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0,
     };
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
@@ -299,6 +300,17 @@
 
   // ===================== 업데이트 =====================
   function update(dt) {
+    // 크레바스 추락 연출 진행 중엔 일반 진행 정지
+    if (player.falling) {
+      player.fallT += dt;
+      player.fallVy += 1100 * dt; player.fallY += player.fallVy * dt;
+      player.fallSpin += dt * 7.5;
+      player.flapT += dt * 34;
+      if (player.fallT > 0.5 && Math.random() < 0.4) spawnParticles(player.holeX, playerLineY(), "#dff0ff", 2, 120);
+      updateParticles(dt); updateTexts(dt);
+      if (player.fallT > 1.3) gameOver();
+      return;
+    }
     elapsed += dt;
     speed = 150 + elapsed * 3.2;                  // 점점 빨라짐
     distance += speed * dt;
@@ -403,11 +415,8 @@
           const dist = Math.abs(player.x - ox);
           if (dist < holeHalf + 6) {
             if (big || dist < holeHalf * 0.45) {
-              // 정가운데(또는 거대 협곡)로 빠짐 → 즉시 아웃
-              spawnParticles(ox, playerLineY(), "#9ab8d0", 24, 260);
-              spawnText(player.x, playerLineY() - 46, "빠졌다! 아웃", "#ff6b6b", 24);
-              screenFlash = 0.6; shake = Math.min(24, shake + 18);
-              SND.fall(); updateHUD(); gameOver();
+              // 정가운데(또는 거대 협곡)로 빠짐 → 추락 연출
+              startFall(ox);
               return;
             } else if (!o.tripped) {
               // 가장자리 돌부리에 걸림 → 넘어지고 에너지 감소(생존)
@@ -453,6 +462,24 @@
     spawnParticles(ox, playerLineY(), "#dfe9f2", 12, 180);
     spawnText(player.x, playerLineY() - 44, "돌부리에 걸려 넘어짐! 💫", "#ffcf9a", 18);
     SND.bad();
+    updateHUD();
+  }
+
+  // 크레바스 추락 연출 시작(아케이드식): 펭귄이 구덩이로 빙글빙글 빨려들고 얼음 파편 솟구침
+  function startFall(ox) {
+    player.falling = true; player.fallT = 0; player.fallY = 0; player.fallVy = 40; player.fallSpin = 0;
+    player.holeX = ox; player.onGround = false;
+    screenFlash = 0.55; shake = Math.min(26, shake + 20);
+    SND.fall();
+    spawnText(ox, playerLineY() - 70, "으악! 빠졌다!", "#ff6b6b", 26);
+    // 얼음 파편 솟구침
+    spawnParticles(ox, playerLineY(), "#ffffff", 16, 320);
+    spawnParticles(ox, playerLineY(), "#bfe6ff", 14, 260);
+    for (let k = 0; k < 8; k++) {   // 큰 얼음 조각(위로)
+      particles.push({ x: ox + (Math.random() - 0.5) * 40, y: playerLineY(),
+        vx: (Math.random() - 0.5) * 220, vy: -180 - Math.random() * 160,
+        life: 0.7 + Math.random() * 0.3, max: 1.0, color: "#eaf6ff", r: 3 + Math.random() * 3 });
+    }
     updateHUD();
   }
 
@@ -1158,9 +1185,20 @@
     const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
     g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
     ctx.fillStyle = g; outline(); ctx.fill();
-    ctx.fillStyle = "rgba(180,225,245,0.3)"; ctx.beginPath(); ctx.ellipse(cx - rx * 0.3, y - ry * 0.3, rx * 0.3, ry * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    // 안쪽 깊은 그늘(깊이감)
+    ctx.fillStyle = "rgba(4,18,34,0.5)";
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr + ry * 0.2; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+    ctx.closePath(); ctx.fill();
+    // 얼음 잔금(가장자리→안쪽)
+    ctx.strokeStyle = "rgba(205,234,250,0.45)"; ctx.lineWidth = Math.max(0.8, sc);
+    for (let k = 0; k < 3; k++) { const a = 0.4 + k * 2.1; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * rx * 0.92, y + Math.sin(a) * ry * 0.92); ctx.lineTo(cx + Math.cos(a) * rx * 0.4, y + Math.sin(a) * ry * 0.4); ctx.stroke(); }
+    // 깨진 얼음 테
     ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
+    // 가장자리 서리 알갱이
+    ctx.fillStyle = "rgba(236,248,255,0.85)";
+    for (let k = 0; k < 5; k++) { const a = 0.4 + k * 1.3; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, y + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.1 * sc), 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
     ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
     ctx.font = "bold " + (9 * sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", cx, y - ry - 8 * sc);
@@ -1184,9 +1222,15 @@
     ctx.moveTo(fcx - frx, fy); ctx.lineTo(fcx + frx, fy);
     ctx.lineTo(bcx + brx, by); ctx.lineTo(bcx - brx, by);
     ctx.closePath(); ctx.fill();
-    // 안쪽 반짝
-    ctx.fillStyle = "rgba(180,225,245,0.22)";
-    ctx.beginPath(); ctx.ellipse((fcx + bcx) / 2 - frx * 0.25, (fy + by) / 2, frx * 0.3, Math.max(2, (fy - by) * 0.18), 0, 0, Math.PI * 2); ctx.fill();
+    // 안쪽 깊은 그늘(깊이감)
+    ctx.fillStyle = "rgba(4,18,34,0.45)";
+    ctx.beginPath();
+    ctx.moveTo(fcx - frx * 0.8, fy - (fy - by) * 0.16); ctx.lineTo(fcx + frx * 0.8, fy - (fy - by) * 0.16);
+    ctx.lineTo(bcx + brx * 0.82, by + (fy - by) * 0.1); ctx.lineTo(bcx - brx * 0.82, by + (fy - by) * 0.1);
+    ctx.closePath(); ctx.fill();
+    // 얼음 잔금(가로 단층)
+    ctx.strokeStyle = "rgba(150,195,225,0.3)"; ctx.lineWidth = Math.max(0.8, sc);
+    for (let k = 1; k <= 2; k++) { const t = k / 3; const yy = by + (fy - by) * t; const cxk = bcx + (fcx - bcx) * t, hk = (brx + (frx - brx) * t) * 0.7; ctx.beginPath(); ctx.moveTo(cxk - hk, yy); ctx.lineTo(cxk + hk, yy); ctx.stroke(); }
     // 앞 가장자리 들쭉날쭉 얼음 테
     ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     ctx.beginPath();
@@ -1351,6 +1395,32 @@
   // ---------- 펭귄(뒤에서 본 달리기) ----------
   function drawPlayer() {
     const x = player.x, y = player.y, lift = player.jumpY;
+
+    // 추락 연출: 어두운 얼음 구덩이 + 빙글빙글 가라앉는 펭귄
+    if (player.falling) {
+      const ox = player.holeX, gy = playerLineY();
+      // 깨진 얼음 구덩이
+      const g = ctx.createRadialGradient(ox, gy, 2, ox, gy, 50);
+      g.addColorStop(0, "#06182a"); g.addColorStop(0.6, "#103a56"); g.addColorStop(1, "#2f6f95");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(ox, gy, 50, 17, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(230,247,255,0.9)"; ctx.lineWidth = 3; ctx.lineJoin = "round";
+      ctx.beginPath();
+      for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI * 2, rr = 1 + (i % 2 ? -0.12 : 0.06); const px = ox + Math.cos(a) * 50 * rr, py = gy + Math.sin(a) * 17 * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+      ctx.closePath(); ctx.stroke();
+      // 그냥 아래로 빠지는 펭귄(살짝 앞으로 기운 채)
+      ctx.save();
+      const scl = Math.max(0.45, 1 - player.fallY / 220);
+      ctx.translate(ox, gy - 20 + player.fallY);
+      ctx.rotate(0.16);
+      ctx.scale(scl, scl);
+      drawPenguin(0, 8, 1.6, player.run, false, false, player.flapT, 0, true, 1);
+      ctx.restore();
+      // 구덩이 앞쪽 어두운 테(펭귄 하단을 가려 들어가는 느낌)
+      ctx.fillStyle = "rgba(8,26,42,0.6)";
+      ctx.beginPath(); ctx.ellipse(ox, gy + 9, 50, 11, 0, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+
     // 줍기 가능 구역(바닥에서만 작동)
     if (state === STATE.PLAY && player.onGround) {
       const cr = 36 + META.up.magnet * 8;
@@ -1491,6 +1561,11 @@
     startGame(); distance = 3120; score = 1480; runCoins = 26;
     learned = { Fe: 1, Cu: 1, Ti: 1, Au: 1, He: 1 };
     gameOver();
+  }
+  // ?fall: 추락 연출 한 프레임 미리보기(정지)
+  if (location.search.indexOf("fall") >= 0) {
+    startGame(); state = STATE.PLAY; galleryMode = true;
+    startFall(W / 2); player.fallY = 46; player.fallSpin = 2.0; player.fallT = 0.55;
   }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
