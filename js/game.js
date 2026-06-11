@@ -78,7 +78,22 @@
   let spawnTimer, elapsed, speed, scrollY, shake, screenFlash;
   let curveT = 0;
   let decorTimer = 0;
+  let lastStage = 0;        // 스테이지(약 4000거리마다 명물이 바뀜)
   let stored = [];          // 상단에 모은 정어리 통조림
+
+  // 스테이지별 전세계 명물(얼음조각으로 등장)
+  const STAGE_LEN = 4000;
+  const LANDMARKS = [
+    { key: "eiffel", name: "프랑스 에펠탑" },
+    { key: "pyramid", name: "이집트 피라미드" },
+    { key: "liberty", name: "미국 자유의 여신상" },
+    { key: "pisa", name: "이탈리아 피사의 사탑" },
+    { key: "windmill", name: "네덜란드 풍차" },
+    { key: "moai", name: "이스터섬 모아이" },
+    { key: "clock", name: "영국 빅벤" },
+    { key: "taj", name: "인도 타지마할" },
+  ];
+  function stageLandmark() { return LANDMARKS[Math.floor(distance / STAGE_LEN) % LANDMARKS.length]; }
   let snow = [], bergs = [], scenery = [];
 
   // ===================== 메타(영구 저장) =====================
@@ -121,7 +136,7 @@
     };
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
-    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3;
+    spawnTimer = 0.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0;
     updateHUD();
   }
 
@@ -221,20 +236,33 @@
       items.push({ type: "can", el: el, lane: -0.75 + Math.random() * 1.5,
         p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
     } else {
-      // 통조림 따개 (뱃지에 원소 이름 한글)
-      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      // 통조림 따개 — 가능하면 모아둔 통조림과 일치하는 원소로(매칭 유도)
+      let el;
+      if (stored.length && Math.random() < 0.72) {
+        const c = stored[(Math.random() * stored.length) | 0];
+        el = BUFF_ELEMENTS.find(function (e) { return e.symbol === c.symbol; }) || BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      } else {
+        el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      }
       items.push({ type: "opener", el: el, lane: -0.7 + Math.random() * 1.4,
         p: 0, vp: 0.10 + Math.random() * 0.02, done: false, wave: Math.random() * 6.28 });
     }
   }
 
-  // 길가 남극 풍경(장식, 충돌 없음)
+  // 길가 풍경(장식, 충돌 없음) — 명물 얼음조각 + 소품
   function spawnScenery() {
-    const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
-    const type = types[(Math.random() * types.length) | 0];
     const side = Math.random() < 0.5 ? -1 : 1;
-    const lane = side * (1.25 + Math.random() * 0.85);   // 길 바깥 빙원
-    scenery.push({ type: type, lane: lane, p: 0, vp: 0.10 + Math.random() * 0.02, flip: side < 0 });
+    if (Math.random() < 0.22) {
+      // 이번 스테이지의 전세계 명물(크게, 멀리)
+      const lm = stageLandmark();
+      scenery.push({ type: "landmark", key: lm.key, lane: side * (1.75 + Math.random() * 0.7),
+        p: 0, vp: 0.085 + Math.random() * 0.015, flip: side < 0 });
+    } else {
+      const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
+      const type = types[(Math.random() * types.length) | 0];
+      scenery.push({ type: type, lane: side * (1.25 + Math.random() * 0.7),
+        p: 0, vp: 0.10 + Math.random() * 0.02, flip: side < 0 });
+    }
   }
 
   // ===================== 업데이트 =====================
@@ -266,6 +294,14 @@
     // 스폰(속도에 비례해 잦아짐)
     spawnTimer -= dt;
     if (spawnTimer <= 0) { spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012); spawnObstacle(); }
+
+    // 스테이지 전환 알림
+    const st = Math.floor(distance / STAGE_LEN);
+    if (st !== lastStage) {
+      lastStage = st;
+      showToast("🗺 스테이지 " + (st + 1) + " — " + stageLandmark().name + " 얼음조각 지대 ❄", false);
+      SND.base();
+    }
 
     // 길가 풍경 스폰/이동
     decorTimer -= dt;
@@ -344,40 +380,44 @@
     }
   }
 
-  // 통조림 따개: 먹으면 쌓인 통조림이 열려 정어리가 나온다. 통조림 없으면 의미 없음.
-  function eatOpener(o, ox, AIR) {
-    const catchR = 34 + META.up.magnet * 6;
-    if (player.jumpY <= AIR && Math.abs(player.x - ox) < catchR) {
-      learned[o.el.symbol] = true;
-      if (stored.length === 0) {
-        spawnText(player.x, playerLineY() - 56, "통조림이 없어요!", "#ffcf9a", 16);
-        SND.bad();
-        showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
-        return;
-      }
-      const cnt = stored.length;
-      const gain = cnt * 120;
-      score += gain; runCoins += cnt;
-      openStored();
-      spawnText(player.x, playerLineY() - 62, "통조림 OPEN! +" + gain, "#ffe678", 22);
-      SND.base();
-      showToast("🥫 통조림 " + cnt + "개 개봉! 🐟 정어리 " + cnt + "마리! +" + gain, false);
-      updateHUD();
-    }
+  // 상단 보관함에서 i번째 통조림의 화면 X
+  function storedSlotX(i) {
+    const n = Math.max(1, Math.min(stored.length, 9));
+    const cw = 24, gap = 5, totalW = n * (cw + gap) - gap;
+    const sx = W / 2 - totalW / 2;
+    return sx + Math.min(i, n - 1) * (cw + gap) + cw / 2;
   }
 
-  // 상단 통조림을 개봉 — 정어리가 쏟아지고 보관함 비움
-  function openStored() {
-    const n = Math.min(stored.length, 9);
-    const cw = 26, gap = 5, totalW = n * (cw + gap) - gap;
-    const sx = W / 2 - totalW / 2, y = 64;
-    for (let i = 0; i < n; i++) {
-      const x = sx + i * (cw + gap) + cw / 2;
-      spawnText(x, y, "🐟", "#bcd6e8", 20);
-      spawnParticles(x, y, "#cfe6f5", 8, 170);
+  // 통조림 따개: 따개와 "같은 원소" 통조림이 있어야 그 통조림이 열린다.
+  function eatOpener(o, ox, AIR) {
+    const catchR = 34 + META.up.magnet * 6;
+    if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return;
+    learned[o.el.symbol] = true;
+
+    if (stored.length === 0) {
+      spawnText(player.x, playerLineY() - 56, "통조림이 없어요!", "#ffcf9a", 16);
+      SND.bad();
+      showToast("따개만 먹으면 의미 없어요 — 먼저 정어리 통조림을 모으세요!", true);
+      return;
     }
-    shake = Math.min(14, shake + 8);
-    stored = [];
+    const idx = stored.findIndex(function (c) { return c.symbol === o.el.symbol; });
+    if (idx === -1) {
+      spawnText(player.x, playerLineY() - 56, o.el.symbol + " 통조림 없음!", "#ffcf9a", 16);
+      SND.bad();
+      showToast("⚠ " + o.el.symbol + " " + o.el.name + " 따개 — 일치하는 통조림이 위에 없어요!", true);
+      return;
+    }
+    // 일치 → 그 통조림만 개봉
+    const slotX = storedSlotX(idx);
+    const c = stored.splice(idx, 1)[0];
+    score += 200; runCoins += 2;
+    spawnText(slotX, 64, "🐟", "#bcd6e8", 22);
+    spawnParticles(slotX, 64, "#cfe6f5", 12, 190);
+    spawnText(player.x, playerLineY() - 62, "🐟 " + c.symbol + " 개봉! +200", "#ffe678", 22);
+    shake = Math.min(12, shake + 6);
+    SND.base();
+    showToast("🥫 " + c.symbol + " " + c.name + " — 따개와 일치! 정어리 +200", false);
+    updateHUD();
   }
 
   function loseLife(msg) {
@@ -553,10 +593,16 @@
   function drawScenery() {
     const sorted = scenery.slice().sort(function (a, b) { return a.p - b.p; });
     for (const d of sorted) {
-      const sc = projScale(d.p) * 1.15;
+      const base = projScale(d.p);
       const x = laneToX(d.p, d.lane);
       const y = projY(d.p);
-      // 발밑 그림자
+      if (d.type === "landmark") {
+        ctx.fillStyle = "rgba(40,80,120,0.16)";
+        ctx.beginPath(); ctx.ellipse(x, y, 24 * base, 5 * base, 0, 0, Math.PI * 2); ctx.fill();
+        drawLandmark(d.key, x, y, base * 2.7, d.flip);
+        continue;
+      }
+      const sc = base * 1.15;
       ctx.fillStyle = "rgba(40,80,120,0.16)";
       ctx.beginPath(); ctx.ellipse(x, y, 16 * sc, 4 * sc, 0, 0, Math.PI * 2); ctx.fill();
       if (d.type === "igloo") drawIgloo(x, y, sc);
@@ -565,6 +611,128 @@
       else if (d.type === "sign") drawSign(x, y, sc);
       else drawSitPenguin(x, y, sc, d.flip);
     }
+  }
+
+  // ---------- 전세계 명물 얼음조각 ----------
+  function iceGrad(yTop) {
+    const g = ctx.createLinearGradient(0, yTop, 0, 0);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(0.55, "#dcebf6"); g.addColorStop(1, "#a6c6dd");
+    return g;
+  }
+  function drawLandmark(key, x, y, s, flip) {
+    const u = 8 * s;
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(120,160,195,0.6)";
+    ctx.lineWidth = Math.max(1, s);
+    if (key === "eiffel") lmEiffel(u);
+    else if (key === "pyramid") lmPyramid(u);
+    else if (key === "liberty") lmLiberty(u);
+    else if (key === "pisa") lmPisa(u);
+    else if (key === "windmill") lmWindmill(u);
+    else if (key === "moai") lmMoai(u);
+    else if (key === "clock") lmClock(u);
+    else lmTaj(u);
+    // 눈 반짝임
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.beginPath(); ctx.arc(-u * 0.3, -u * 5.6, u * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function lmEiffel(u) {
+    ctx.fillStyle = iceGrad(-u * 7);
+    ctx.beginPath();
+    ctx.moveTo(-2 * u, 0); ctx.lineTo(-0.9 * u, -2.4 * u); ctx.lineTo(-0.35 * u, -4.8 * u); ctx.lineTo(-0.12 * u, -7 * u);
+    ctx.lineTo(0.12 * u, -7 * u); ctx.lineTo(0.35 * u, -4.8 * u); ctx.lineTo(0.9 * u, -2.4 * u); ctx.lineTo(2 * u, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(-1.4 * u, -2.5 * u, 2.8 * u, 0.35 * u);
+    ctx.fillRect(-0.8 * u, -4.9 * u, 1.6 * u, 0.3 * u);
+    // 아치
+    ctx.fillStyle = "rgba(70,110,150,0.35)";
+    ctx.beginPath(); ctx.moveTo(-1.1 * u, 0); ctx.quadraticCurveTo(0, -1.8 * u, 1.1 * u, 0); ctx.closePath(); ctx.fill();
+  }
+  function lmPyramid(u) {
+    ctx.fillStyle = iceGrad(-u * 5.5);
+    ctx.beginPath(); ctx.moveTo(-3.2 * u, 0); ctx.lineTo(0, -5.5 * u); ctx.lineTo(3.2 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 블록 라인
+    ctx.strokeStyle = "rgba(120,160,195,0.4)";
+    ctx.beginPath();
+    for (let k = 1; k < 5; k++) { const yy = -k * u; const hw = 3.2 * u * (1 - k / 5.5); ctx.moveTo(-hw, yy); ctx.lineTo(hw, yy); }
+    ctx.stroke();
+    // 작은 피라미드
+    ctx.fillStyle = iceGrad(-u * 3);
+    ctx.beginPath(); ctx.moveTo(2.4 * u, 0); ctx.lineTo(3.6 * u, -3 * u); ctx.lineTo(4.8 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function lmLiberty(u) {
+    ctx.fillStyle = iceGrad(-u * 7.5);
+    ctx.fillRect(-1.6 * u, -2 * u, 3.2 * u, 2 * u); ctx.strokeRect(-1.6 * u, -2 * u, 3.2 * u, 2 * u);   // 받침
+    ctx.beginPath(); ctx.moveTo(-1.3 * u, -2 * u); ctx.lineTo(-0.6 * u, -5.4 * u); ctx.lineTo(0.6 * u, -5.4 * u); ctx.lineTo(1.3 * u, -2 * u); ctx.closePath(); ctx.fill(); ctx.stroke();  // 로브
+    ctx.beginPath(); ctx.arc(0, -6 * u, 0.62 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();  // 머리
+    // 왕관 가시
+    ctx.fillStyle = iceGrad(-u * 7.5);
+    for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(k * 0.28 * u - 0.1 * u, -6.5 * u); ctx.lineTo(k * 0.28 * u, -7.2 * u); ctx.lineTo(k * 0.28 * u + 0.1 * u, -6.5 * u); ctx.closePath(); ctx.fill(); }
+    // 든 팔 + 횃불
+    ctx.lineWidth = Math.max(1.5, 1.2 * u); ctx.strokeStyle = "#dcebf6"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0.5 * u, -5 * u); ctx.lineTo(1.2 * u, -7.2 * u); ctx.stroke();
+    ctx.fillStyle = "#ffe6a0"; ctx.beginPath(); ctx.arc(1.25 * u, -7.6 * u, 0.4 * u, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(120,160,195,0.6)"; ctx.lineWidth = Math.max(1, u * 0.12);
+  }
+  function lmPisa(u) {
+    ctx.save(); ctx.rotate(-0.13);
+    ctx.fillStyle = iceGrad(-u * 6);
+    ctx.fillRect(-1.1 * u, -6 * u, 2.2 * u, 6 * u); ctx.strokeRect(-1.1 * u, -6 * u, 2.2 * u, 6 * u);
+    ctx.strokeStyle = "rgba(120,160,195,0.4)";
+    for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(-1.1 * u, -k * u); ctx.lineTo(1.1 * u, -k * u); ctx.stroke(); }
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(-1.0 * u, -6.6 * u, 2.0 * u, 0.6 * u);
+    ctx.restore();
+  }
+  function lmWindmill(u) {
+    ctx.fillStyle = iceGrad(-u * 5);
+    ctx.beginPath(); ctx.moveTo(-1.7 * u, 0); ctx.lineTo(-1.1 * u, -5 * u); ctx.lineTo(1.1 * u, -5 * u); ctx.lineTo(1.7 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = iceGrad(-u * 6.2);
+    ctx.beginPath(); ctx.moveTo(-1.2 * u, -5 * u); ctx.lineTo(0, -6.2 * u); ctx.lineTo(1.2 * u, -5 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 날개(회전)
+    ctx.save(); ctx.translate(0, -5 * u); ctx.rotate(elapsed * 1.2);
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.strokeStyle = "rgba(120,160,195,0.6)";
+    for (let b = 0; b < 4; b++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0.5 * u, -0.4 * u); ctx.lineTo(0.4 * u, -3.2 * u); ctx.lineTo(-0.2 * u, -3 * u); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "#7fa8c4"; ctx.beginPath(); ctx.arc(0, -5 * u, 0.4 * u, 0, Math.PI * 2); ctx.fill();
+  }
+  function lmMoai(u) {
+    ctx.fillStyle = iceGrad(-u * 6);
+    ctx.beginPath();
+    ctx.moveTo(-1.5 * u, 0); ctx.lineTo(-1.7 * u, -3.5 * u); ctx.quadraticCurveTo(-1.7 * u, -6 * u, 0, -6 * u);
+    ctx.quadraticCurveTo(1.7 * u, -6 * u, 1.7 * u, -3.5 * u); ctx.lineTo(1.5 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 눈썹/코
+    ctx.fillStyle = "rgba(80,120,160,0.35)";
+    ctx.fillRect(-1.2 * u, -4.4 * u, 2.4 * u, 0.5 * u);
+    ctx.beginPath(); ctx.moveTo(-0.3 * u, -4 * u); ctx.lineTo(0.3 * u, -4 * u); ctx.lineTo(0, -2.2 * u); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-0.9 * u, -1.5 * u, 1.8 * u, 0.4 * u);
+  }
+  function lmClock(u) {
+    ctx.fillStyle = iceGrad(-u * 6.5);
+    ctx.fillRect(-1.3 * u, -6.5 * u, 2.6 * u, 6.5 * u); ctx.strokeRect(-1.3 * u, -6.5 * u, 2.6 * u, 6.5 * u);
+    ctx.fillStyle = iceGrad(-u * 8);
+    ctx.beginPath(); ctx.moveTo(-1.3 * u, -6.5 * u); ctx.lineTo(0, -8 * u); ctx.lineTo(1.3 * u, -6.5 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 시계
+    ctx.fillStyle = "#eef6ff"; ctx.beginPath(); ctx.arc(0, -5.2 * u, 0.95 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#5f7e98"; ctx.lineWidth = Math.max(1, u * 0.16); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0, -5.9 * u); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0.5 * u, -5 * u); ctx.stroke();
+    ctx.strokeStyle = "rgba(120,160,195,0.6)"; ctx.lineWidth = Math.max(1, u * 0.12);
+  }
+  function lmTaj(u) {
+    ctx.fillStyle = iceGrad(-u * 6);
+    ctx.fillRect(-2.2 * u, -2.2 * u, 4.4 * u, 2.2 * u); ctx.strokeRect(-2.2 * u, -2.2 * u, 4.4 * u, 2.2 * u);   // 기단
+    // 중앙 양파돔
+    ctx.beginPath();
+    ctx.moveTo(-1.3 * u, -2.2 * u); ctx.quadraticCurveTo(-1.6 * u, -4.4 * u, 0, -5.2 * u);
+    ctx.quadraticCurveTo(1.6 * u, -4.4 * u, 1.3 * u, -2.2 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#dcebf6"; ctx.beginPath(); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0, -6 * u); ctx.stroke();
+    // 미나렛 4개
+    ctx.fillStyle = iceGrad(-u * 5);
+    for (const mx of [-2.6, -2.0, 2.0, 2.6]) { ctx.fillRect(mx * u - 0.2 * u, -5 * u, 0.4 * u, 5 * u); ctx.strokeRect(mx * u - 0.2 * u, -5 * u, 0.4 * u, 5 * u); }
   }
   function drawIgloo(x, y, s) {
     const r = 17 * s;
@@ -680,30 +848,50 @@
     ctx.textAlign = "start";
   }
 
-  // 통조림 따개(원소 이름 한글)
+  // 통조림 따개(돌려 따는 도구 모양 + 원소 이름 한글 태그)
   function drawOpener(o) {
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
-    const w = 38 * sc, h = 18 * sc;
-    const cy = gy - 26 * sc - h + Math.sin(o.wave) * 2 * sc;
-    // 그림자 + 받침대
-    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 8 * sc, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#9aa6b2"; ctx.lineWidth = Math.max(1.5, 2 * sc); ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, cy + h); ctx.stroke();
-    // 금속 톱니 날(위)
-    ctx.fillStyle = "#cfd8e3"; ctx.strokeStyle = "rgba(80,110,140,0.6)"; ctx.lineWidth = Math.max(1, sc);
-    for (let k = -1; k <= 1; k++) {
-      const px = x + k * w * 0.2;
-      ctx.beginPath(); ctx.moveTo(px - 3 * sc, cy); ctx.lineTo(px, cy - 6 * sc); ctx.lineTo(px + 3 * sc, cy); ctx.closePath(); ctx.fill(); ctx.stroke();
+    const bob = Math.sin(o.wave) * 2 * sc;
+    const hy = gy - 16 * sc + bob;     // 도구 본체 중심
+
+    // 그림자
+    ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 14 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(x, hy);
+    // 빨간 손잡이(두 다리)
+    ctx.fillStyle = "#d8444f"; ctx.strokeStyle = "rgba(120,30,40,0.5)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.fillRect(-7 * sc, 3 * sc, 5 * sc, 15 * sc); ctx.strokeRect(-7 * sc, 3 * sc, 5 * sc, 15 * sc);
+    ctx.fillRect(2 * sc, 3 * sc, 5 * sc, 15 * sc); ctx.strokeRect(2 * sc, 3 * sc, 5 * sc, 15 * sc);
+    // 금속 헤드(타원)
+    ctx.fillStyle = "#e1e8ef"; ctx.strokeStyle = "rgba(90,120,150,0.6)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.beginPath(); ctx.ellipse(0, 0, 13 * sc, 8 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 톱니 절단 바퀴(왼쪽)
+    const gx = -5 * sc, gr = 5.2 * sc, teeth = 8;
+    ctx.fillStyle = "#8fa1b2"; ctx.beginPath();
+    for (let i = 0; i <= teeth * 2; i++) {
+      const a = i / (teeth * 2) * Math.PI * 2, rr = (i % 2 ? gr * 0.6 : gr);
+      const px = gx + Math.cos(a) * rr, py = Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
-    // 손잡이(빨강) + 한글 원소 이름
-    ctx.fillStyle = "#d8444f"; ctx.strokeStyle = "rgba(255,200,200,0.85)"; ctx.lineWidth = Math.max(1, 1.5 * sc);
-    ctx.fillRect(x - w / 2, cy, w, h); ctx.strokeRect(x - w / 2, cy, w, h);
-    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (h * 0.5) + "px sans-serif";
-    ctx.fillText(o.el.name, x, cy + h * 0.68);
-    // "따개" 라벨
-    ctx.fillStyle = "#ffd7da"; ctx.font = "bold " + (7 * sc + 4) + "px sans-serif";
-    ctx.fillText("🔧 따개", x, cy - 8 * sc);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#5f7080"; ctx.beginPath(); ctx.arc(gx, 0, gr * 0.32, 0, Math.PI * 2); ctx.fill();
+    // 나비 손잡이(오른쪽 돌리는 키)
+    ctx.fillStyle = "#b9c4cf"; ctx.strokeStyle = "rgba(90,120,150,0.5)";
+    ctx.beginPath(); ctx.ellipse(8 * sc, -2 * sc, 3.4 * sc, 1.8 * sc, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(8 * sc, 2 * sc, 3.4 * sc, 1.8 * sc, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // 한글 원소 이름 태그(도구 위)
+    const ty = hy - 16 * sc;
+    const fs = 8 * sc + 5;
+    ctx.font = "bold " + fs + "px sans-serif";
+    const tw = ctx.measureText(o.el.name).width + 12 * sc;
+    ctx.fillStyle = "rgba(18,28,42,0.88)"; ctx.fillRect(x - tw / 2, ty - fs, tw, fs + 5 * sc);
+    ctx.strokeStyle = "rgba(255,210,150,0.8)"; ctx.lineWidth = Math.max(1, sc); ctx.strokeRect(x - tw / 2, ty - fs, tw, fs + 5 * sc);
+    ctx.fillStyle = "#ffe6b0"; ctx.textAlign = "center";
+    ctx.fillText(o.el.name, x, ty - 1 * sc);
     ctx.textAlign = "start";
   }
 
