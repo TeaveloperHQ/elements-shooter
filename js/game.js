@@ -471,8 +471,8 @@
       // 보스 충돌
       if (boss) {
         const bs = projScale(boss.p);
-        const bxx = laneToX(boss.p, boss.lane), byy = projY(boss.p) - boss.r * bs * 0.9;
-        const rad = boss.r * bs * 1.5 + 6 * projScale(b.p);
+        const bxx = laneToX(boss.p, boss.lane), byy = projY(boss.p) - boss.r * bs * 1.15;
+        const rad = boss.r * bs * 1.6 + 6 * projScale(b.p);
         const dx = bx - bxx, dy = by - byy;
         if (dx * dx + dy * dy <= rad * rad) {
           boss.hp -= b.dmg; boss.hit = 0.1;
@@ -487,8 +487,8 @@
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j];
         const es = projScale(e.p);
-        const ex = laneToX(e.p, e.lane), ey = projY(e.p) - e.r * es * 0.85;  // 몸통 중심
-        const rad = e.r * es * 1.4 + 6 * projScale(b.p);
+        const ex = laneToX(e.p, e.lane), ey = projY(e.p) - e.r * es * 1.1;  // 몸통 중심
+        const rad = e.r * es * 1.55 + 6 * projScale(b.p);
         const dx = bx - ex, dy = by - ey;
         if (dx * dx + dy * dy <= rad * rad) {
           if (e.shell > 0) {
@@ -1122,18 +1122,26 @@
   function drawBearHead(cx, cy, r, L, D, ol, lw) {
     ctx.save();
     ctx.translate(cx, cy);
+    // 입체 음영(좌상단 하이라이트 → 우하단 그늘)
+    const hg = ctx.createRadialGradient(-r * 0.4, -r * 0.45, r * 0.15, r * 0.1, r * 0.1, r * 1.25);
+    hg.addColorStop(0, "#ffffff"); hg.addColorStop(0.55, L); hg.addColorStop(1, D);
     // 귀
-    ctx.fillStyle = L; ctx.strokeStyle = ol; ctx.lineWidth = lw;
+    ctx.fillStyle = hg; ctx.strokeStyle = ol; ctx.lineWidth = lw;
     ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.66, r * 0.34, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.66, r * 0.34, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "rgba(120,150,180,0.5)";
     ctx.beginPath(); ctx.arc(-r * 0.66, -r * 0.62, r * 0.16, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.62, r * 0.16, 0, Math.PI * 2); ctx.fill();
     // 머리
-    ctx.fillStyle = L; ctx.strokeStyle = ol; ctx.lineWidth = lw;
+    ctx.fillStyle = hg; ctx.strokeStyle = ol; ctx.lineWidth = lw;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // 주둥이/코
-    ctx.fillStyle = "rgba(230,242,252,0.96)";
+    // 턱밑 그늘(몸통과 만나는 부분, 입체감)
+    ctx.fillStyle = "rgba(60,90,125,0.18)";
+    ctx.beginPath(); ctx.ellipse(0, r * 0.55, r * 0.8, r * 0.5, 0, 0, Math.PI); ctx.fill();
+    // 주둥이(돌출, 하이라이트)
+    const mg = ctx.createRadialGradient(0, r * 0.28, r * 0.1, 0, r * 0.42, r * 0.55);
+    mg.addColorStop(0, "#ffffff"); mg.addColorStop(1, "rgba(214,230,244,0.96)");
+    ctx.fillStyle = mg;
     ctx.beginPath(); ctx.ellipse(0, r * 0.42, r * 0.5, r * 0.4, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#161b22";
     ctx.beginPath(); ctx.ellipse(0, r * 0.2, r * 0.17, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
@@ -1185,41 +1193,46 @@
 
     // 사족 보행 사이클: 앞다리/뒷다리 번갈아
     const fS = Math.sin(walk), bS = Math.sin(walk + Math.PI);
-    const fSw = fS * r * 0.22, bSw = bS * r * 0.22;        // 앞뒤 스윙
-    const fLift = Math.max(0, fS) * r * 0.18;              // 발 들어올림
-    const bLift = Math.max(0, bS) * r * 0.18;
+    const fSw = fS * r * 0.2, bSw = bS * r * 0.2;          // 앞뒤 스윙
+    const fLift = Math.max(0, fS) * r * 0.16;              // 발 들어올림
+    const bLift = Math.max(0, bS) * r * 0.16;
     const bob = Math.abs(Math.sin(walk)) * r * 0.05;
 
-    const bodyCY = -r * 1.0 - bob;     // 등(뒤·위)
-    const headR = r * 0.92;
-    const headCY = -r * 0.62 - bob * 0.5;  // 머리(앞·아래)
+    // 큰 몸통 + 작은 머리
+    const bodyCY = -r * 1.2 - bob;     // 등(뒤·위, 크게)
+    const bRX = r * 1.32, bRY = r * 1.02;
+    const headR = r * 0.6;             // 머리(작게)
+    const headCY = -r * 0.5 - bob * 0.5;   // 머리(앞·아래)
 
     ctx.lineCap = "round";
 
-    // 뒷다리(뒤·어둡게) — 등 뒤에서 바닥으로
-    ctx.strokeStyle = D; ctx.lineWidth = r * 0.34;
-    ctx.beginPath(); ctx.moveTo(-r * 0.5, bodyCY + r * 0.25); ctx.lineTo(-r * 0.55 + bSw, -bLift); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r * 0.5, bodyCY + r * 0.25); ctx.lineTo(r * 0.55 + bSw, -bLift); ctx.stroke();
+    // 뒷다리(뒤·어둡게) — 큰 몸 뒤쪽에서 바닥으로
+    ctx.strokeStyle = D; ctx.lineWidth = r * 0.4;
+    ctx.beginPath(); ctx.moveTo(-bRX * 0.52, bodyCY + bRY * 0.45); ctx.lineTo(-bRX * 0.56 + bSw, -bLift); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bRX * 0.52, bodyCY + bRY * 0.45); ctx.lineTo(bRX * 0.56 + bSw, -bLift); ctx.stroke();
 
-    // 등/몸통(낮고 둥근 덩치)
-    ctx.fillStyle = L; ctx.strokeStyle = ol; ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.ellipse(0, bodyCY, r * 0.98, r * 0.68, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath(); ctx.ellipse(-r * 0.12, bodyCY - r * 0.12, r * 0.5, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+    // 몸통(입체 그라데이션, 어깨 hump)
+    const bg = ctx.createRadialGradient(-bRX * 0.35, bodyCY - bRY * 0.45, r * 0.2, 0, bodyCY, bRX * 1.15);
+    bg.addColorStop(0, "#ffffff"); bg.addColorStop(0.55, L); bg.addColorStop(1, D);
+    ctx.fillStyle = bg; ctx.strokeStyle = ol; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.ellipse(0, bodyCY, bRX, bRY, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 어깨 hump 하이라이트
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.beginPath(); ctx.ellipse(-bRX * 0.18, bodyCY - bRY * 0.4, bRX * 0.5, bRY * 0.38, 0, 0, Math.PI * 2); ctx.fill();
 
     // 앞다리(앞·밝게) — 어깨에서 바닥으로
-    ctx.strokeStyle = L; ctx.lineWidth = r * 0.4;
-    ctx.beginPath(); ctx.moveTo(-r * 0.52, bodyCY + r * 0.4); ctx.lineTo(-r * 0.64 + fSw, -fLift); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r * 0.52, bodyCY + r * 0.4); ctx.lineTo(r * 0.64 + fSw, -fLift); ctx.stroke();
+    ctx.strokeStyle = L; ctx.lineWidth = r * 0.46;
+    ctx.beginPath(); ctx.moveTo(-bRX * 0.34, bodyCY + bRY * 0.6); ctx.lineTo(-bRX * 0.42 + fSw, -fLift); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bRX * 0.34, bodyCY + bRY * 0.6); ctx.lineTo(bRX * 0.42 + fSw, -fLift); ctx.stroke();
     ctx.fillStyle = "rgba(70,100,135,0.45)";   // 앞발
-    ctx.beginPath(); ctx.ellipse(-r * 0.64 + fSw, -fLift, r * 0.2, r * 0.11, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(r * 0.64 + fSw, -fLift, r * 0.2, r * 0.11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-bRX * 0.42 + fSw, -fLift, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bRX * 0.42 + fSw, -fLift, r * 0.22, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 머리(앞·아래, 가장 크게) + 왕관
+    // 머리(작게, 앞·아래) + 왕관
     drawBearHead(0, headCY, headR, L, D, ol, lw);
     if (isBoss) drawBearCrown(0, headCY - headR, headR);
 
-    return { topY: headCY - headR * 1.35, headCY: headCY, headR: headR };
+    return { topY: bodyCY - bRY * 1.05, headCY: headCY, headR: headR };
   }
 
   // ---------- 북극곰 적 ----------
@@ -1243,19 +1256,20 @@
 
       const info = drawPolarBear(r, c[0], c[1], e.walk, e.hit > 0, false);
 
+      const ty = info.topY;
       // 원거리형: 등에 눈 대포
       if (e.kind === "ranged") {
         ctx.fillStyle = "#8a5a2a";
-        ctx.fillRect(-r * 0.16, -r * 1.9, r * 0.32, r * 0.55);
+        ctx.fillRect(-r * 0.16, ty, r * 0.32, r * 0.55);
         ctx.fillStyle = "#5e3c1c";
-        ctx.fillRect(-r * 0.16, -r * 1.9, r * 0.32, r * 0.16);
+        ctx.fillRect(-r * 0.16, ty, r * 0.32, r * 0.16);
       }
       // 얼음 껍질(안 깨진 동안) — 몸 전체를 감싸는 얼음막
       if (e.shell > 0) {
         ctx.strokeStyle = "rgba(225,248,255,0.95)";
         ctx.fillStyle = "rgba(205,238,255,0.22)";
         ctx.lineWidth = Math.max(1.5, 2.5 * sc);
-        ctx.beginPath(); ctx.ellipse(0, -r * 0.85, r * 1.3, r * 1.2, 0, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.ellipse(0, ty * 0.5, r * 1.55, -ty * 0.6, 0, 0, Math.PI * 2);
         ctx.fill(); ctx.stroke();
       }
       ctx.restore();
