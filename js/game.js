@@ -532,8 +532,18 @@
     }
   }
   function buildBergs() {
-    bergs = []; let x = -20;
-    while (x < W + 40) { const w = 40 + Math.random() * 70; bergs.push({ x: x, w: w, h: 24 + Math.random() * 46 }); x += w * (0.7 + Math.random() * 0.5); }
+    bergs = [];
+    // 뒤(멀고 어두움) → 앞(가깝고 밝음) 2겹, 모양/높이/봉우리 위치 제각각
+    for (let layer = 0; layer < 2; layer++) {
+      let x = -40 - layer * 30;
+      while (x < W + 50) {
+        const w = (layer ? 55 : 38) + Math.random() * (layer ? 85 : 55);
+        const h = (layer ? 34 : 20) + Math.random() * (layer ? 58 : 36);
+        bergs.push({ x: x, w: w, h: h, layer: layer,
+          peak: 0.28 + Math.random() * 0.44, cap: Math.random() < 0.7 });
+        x += w * (0.55 + Math.random() * 0.4);
+      }
+    }
   }
 
   // ===================== 렌더 =====================
@@ -578,7 +588,7 @@
     ctx.fillStyle = low && (Math.sin(elapsed * 8) > 0) ? "#ff8a8a" : "#cfe6ff";
     ctx.fillText(low ? "🍴" : "⚡", gx + gw / 2, gy - 5);
     ctx.fillStyle = low ? "#ff8a8a" : "#aef0c0"; ctx.font = "bold 9px sans-serif";
-    ctx.fillText(low ? "배고픔" : (frac > 0.5 ? "비행OK" : "에너지"), gx + gw / 2, gy + gh + 12);
+    ctx.fillText(low ? "허기" : (frac > 0.5 ? "비행" : "에너지"), gx + gw / 2, gy + gh + 12);
     ctx.textAlign = "start";
   }
 
@@ -649,15 +659,33 @@
     sg.addColorStop(0, "rgba(255,255,255,0.95)"); sg.addColorStop(0.4, "rgba(200,235,255,0.5)"); sg.addColorStop(1, "rgba(200,235,255,0)");
     ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.74, hy * 0.6, 60, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 
-    // 빙산
-    ctx.fillStyle = "rgba(180, 215, 235, 0.85)";
-    for (const b of bergs) { ctx.beginPath(); ctx.moveTo(b.x, hy); ctx.lineTo(b.x + b.w * 0.5, hy - b.h); ctx.lineTo(b.x + b.w, hy); ctx.closePath(); ctx.fill(); }
+    // 빙산 — 2겹(뒤→앞), 좌면 밝음/우면 그늘 + 눈모자로 입체감
+    for (const b of bergs) {
+      const px = b.x + b.w * b.peak, top = hy - b.h;
+      const lit = b.layer ? "rgba(150,190,222,0.92)" : "rgba(206,230,247,0.96)";
+      const shade = b.layer ? "rgba(116,160,198,0.92)" : "rgba(168,204,232,0.96)";
+      ctx.fillStyle = lit;   // 왼면
+      ctx.beginPath(); ctx.moveTo(b.x, hy); ctx.lineTo(px, top); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = shade; // 오른면(그늘)
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(b.x + b.w, hy); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      if (b.cap) {           // 눈 모자
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.beginPath();
+        ctx.moveTo(px, top);
+        ctx.lineTo(px - b.w * 0.13, top + b.h * 0.26);
+        ctx.lineTo(px - b.w * 0.02, top + b.h * 0.20);
+        ctx.lineTo(px + b.w * 0.11, top + b.h * 0.30);
+        ctx.closePath(); ctx.fill();
+      }
+    }
 
     // 빙판 길(굽이치는 트랙) — 슬라이스로 그린다
     const pBottom = (H - hy) / (playerLineY() - hy);   // 화면 맨 아래까지의 깊이
     const N = 28;
-    // 길 바깥 빙원
-    ctx.fillStyle = "#eaf6ff";
+    // 길 바깥 빙원(은은한 그라데이션)
+    const plain = ctx.createLinearGradient(0, hy, 0, H);
+    plain.addColorStop(0, "#d6e8f6"); plain.addColorStop(1, "#f1f9ff");
+    ctx.fillStyle = plain;
     ctx.fillRect(0, hy, W, H - hy);
     // 곡선 길 슬라이스
     ctx.fillStyle = "#dff1ff";
@@ -671,6 +699,30 @@
       ctx.lineTo(c1 + h1, y1); ctx.lineTo(c1 - h1, y1);
       ctx.closePath(); ctx.fill();
     }
+    // 길 가장자리 눈둑(흰 도드라짐) — 길이 텅 비어 보이지 않게 입체감
+    for (let s = 0; s < 2; s++) {
+      const sgn = s === 0 ? -1 : 1;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p), y = projY(p); if (i === 0) ctx.moveTo(c + sgn * h, y); else ctx.lineTo(c + sgn * h, y); }
+      for (let i = N; i >= 0; i--) { const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p), y = projY(p), bw = 5 + 9 * projScale(p); ctx.lineTo(c + sgn * (h + bw), y); }
+      ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fill();
+    }
+    // 안쪽 그늘(둑 밑)
+    ctx.strokeStyle = "rgba(120, 165, 205, 0.4)"; ctx.lineWidth = 2;
+    for (let s = 0; s < 2; s++) {
+      const sgn = s === 0 ? -1 : 1; ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p), y = projY(p); if (i === 0) ctx.moveTo(c + sgn * (h - 1.5), y); else ctx.lineTo(c + sgn * (h - 1.5), y); }
+      ctx.stroke();
+    }
+    // 길 중앙 광택(은은한 빛띠)
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const sheen = ctx.createLinearGradient(0, hy, 0, H);
+    sheen.addColorStop(0, "rgba(255,255,255,0)"); sheen.addColorStop(0.7, "rgba(210,240,255,0.10)"); sheen.addColorStop(1, "rgba(230,248,255,0.22)");
+    ctx.fillStyle = sheen;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) { const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p) * 0.5, y = projY(p); if (i === 0) ctx.moveTo(c - h, y); else ctx.lineTo(c - h, y); }
+    for (let i = N; i >= 0; i--) { const p = (i / N) * pBottom, c = curveCenterX(p), h = halfAt(p) * 0.5, y = projY(p); ctx.lineTo(c + h, y); }
+    ctx.closePath(); ctx.fill(); ctx.restore();
     // 가장자리 라인
     ctx.strokeStyle = "rgba(90, 150, 200, 0.5)"; ctx.lineWidth = 2;
     for (let s = 0; s < 2; s++) {
@@ -1281,4 +1333,9 @@
   refreshMetaUI();
   resize();
   requestAnimationFrame(loop);
+
+  // 스크린샷/디버그용: ?auto 면 자동 시작
+  if (location.search.indexOf("auto") >= 0 || location.hash.indexOf("auto") >= 0) {
+    setTimeout(startGame, 30);
+  }
 })();
