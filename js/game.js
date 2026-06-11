@@ -59,6 +59,8 @@
     boss: function () { beep(70, 0.5, "sawtooth", 0.10, 110); },
     item: function () { beep(680, 0.10, "triangle", 0.06, 1020); },
     combo: function (n) { beep(520 + n * 40, 0.06, "square", 0.04, 760 + n * 40); },
+    jump: function () { beep(300, 0.12, "square", 0.04, 640); },
+    fish: function () { beep(760, 0.09, "triangle", 0.05, 1100); },
   };
 
   // ===================== 원근(perspective) 좌표 =====================
@@ -74,31 +76,13 @@
   function laneToX(p, lane) { return W / 2 + lane * halfAt(p); }
   function xToLane(x) { return (x - W / 2) / roadHalfBot(); }  // 바닥(p=1) 기준
 
-  // 게이트 벽 높이(원근에 따라 가까울수록 높아짐)
-  function gateWallH(p) { return 78 * projScale(p); }
-
-  // 게이트 한 칸(좌/우): 바닥에서 위로 서 있는 벽(빌보드)
-  function panelGeom(pr, side) {
-    const p = pr.p;
-    const vx = W / 2;
-    const half = halfAt(p);
-    const baseY = projY(p);              // 바닥에 닿는 선
-    const topY = baseY - gateWallH(p);   // 위로 솟은 높이
-    let x0, x1;
-    if (side < 0) { x0 = vx - half; x1 = vx; }
-    else { x0 = vx; x1 = vx + half; }
-    return { x0: x0, x1: x1, baseY: baseY, topY: topY,
-             cx: (x0 + x1) / 2, cy: (baseY + topY) / 2,
-             scale: projScale(p), half: half };
-  }
-
   // ===================== 게임 상태 =====================
   const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
   let state = STATE.MENU;
 
-  let player, bullets, enemies, gates, particles, flashes, items, texts, eBullets;
+  let player, bullets, enemies, obstacles, particles, flashes, items, texts, eBullets;
   let score, learned;
-  let spawnTimer, gateTimer, fireTimer, elapsed;
+  let spawnTimer, obsTimer, fireTimer, elapsed;
   let scrollY = 0;
   let shake = 0;
   let lineFlash = 0;     // 방어선 돌파 시 빨강 번쩍
@@ -148,11 +132,13 @@
       shield: META.up.shield * 2,
       fireRate: 1,
       bob: 0,
+      jumpY: 0, vz: 0, onGround: true,   // 점프 상태
+      fish: 0,                            // 모은 정어리
     };
     runCoins = 0;
     bullets = [];
     enemies = [];
-    gates = [];
+    obstacles = [];
     particles = [];
     flashes = [];
     items = [];
@@ -166,7 +152,7 @@
     score = 0;
     learned = {};
     spawnTimer = 0;
-    gateTimer = 1.0;
+    obsTimer = 1.4;
     fireTimer = 0;
     elapsed = 0;
     shake = 0;
@@ -182,18 +168,27 @@
     const rect = canvas.getBoundingClientRect();
     player.targetX = clientX - rect.left;
   }
+  function jump() {
+    if (state !== STATE.PLAY || !player.onGround) return;
+    player.vz = 560;          // 위로 솟는 초기 속도
+    player.onGround = false;
+    SND.jump();
+  }
   canvas.addEventListener("mousemove", function (e) {
     if (state === STATE.PLAY) pointerMove(e.clientX);
   });
+  canvas.addEventListener("mousedown", function () { jump(); });   // 클릭 = 점프
   canvas.addEventListener("touchmove", function (e) {
     if (state === STATE.PLAY && e.touches[0]) { pointerMove(e.touches[0].clientX); e.preventDefault(); }
   }, { passive: false });
   canvas.addEventListener("touchstart", function (e) {
     if (state === STATE.PLAY && e.touches[0]) pointerMove(e.touches[0].clientX);
+    jump();                                                        // 탭 = 점프
   });
   window.addEventListener("keydown", function (e) {
     if (e.key === "ArrowLeft") keyLeft = true;
     if (e.key === "ArrowRight") keyRight = true;
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "Spacebar") { jump(); e.preventDefault(); }
   });
   window.addEventListener("keyup", function (e) {
     if (e.key === "ArrowLeft") keyLeft = false;
@@ -266,7 +261,8 @@
     META.save();
 
     document.getElementById("run-coins").innerHTML =
-      "🪙 이번 판 코인 <b>+" + runCoins + "</b>" + (isRecord ? "　🏆 <b>신기록!</b>" : "");
+      "🐟 정어리 <b>" + player.fish + "</b>마리　🪙 코인 <b>+" + runCoins + "</b>" +
+      (isRecord ? "　🏆 <b>신기록!</b>" : "");
 
     const names = Object.keys(learned);
     document.getElementById("elements-learned").innerHTML =
@@ -282,7 +278,7 @@
     document.getElementById("hud-squad").textContent = player.squad;
     document.getElementById("hud-weapon").textContent = player.weapon;
     document.getElementById("hud-shield").textContent = player.shield;
-    document.getElementById("hud-coins").textContent = runCoins;
+    document.getElementById("hud-fish").textContent = player.fish;
     document.getElementById("hud-score").textContent = Math.floor(score);
   }
 
@@ -296,44 +292,44 @@
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
   }
 
-  // ===================== 게이트 =====================
-  // 좌우 한 쌍(한쪽은 안전 원소, 한쪽은 위험 원소)이 지평선에서 길을 막는 벽처럼
-  // 원근으로 다가온다. 쏘면 숫자가 커지고, 안전 게이트를 목표치까지 채우면 폭발 + 아이템.
-  function spawnGatePair() {
-    const buff = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
-    const trap = TRAP_ELEMENTS[(Math.random() * TRAP_ELEMENTS.length) | 0];
-    const leftIsBuff = Math.random() < 0.5;
-    gates.push({
-      p: 0.0,
-      vp: 0.085 + Math.random() * 0.02,
-      applied: false,
-      panels: [
-        makePanel(-1, leftIsBuff ? buff : trap),
-        makePanel(+1, leftIsBuff ? trap : buff),
-      ],
-    });
+  // ===================== 함정 & 정어리 =====================
+  // 빙판 길로 다가오는 장애물:
+  //  - 함정(trap): 위험 원소(방사능·독성). 점프로 넘어야 한다. 못 넘으면 페널티.
+  //  - 정어리(sardine): 안전 원소 배지를 단 물고기. 땅에서 주우면 강화 + 원소 학습.
+  function spawnObstacle() {
+    // 약 55% 함정, 45% 정어리
+    if (Math.random() < 0.55) {
+      const el = TRAP_ELEMENTS[(Math.random() * TRAP_ELEMENTS.length) | 0];
+      obstacles.push({ type: "trap", el: el, lane: 0, p: 0.0,
+        vp: 0.085 + Math.random() * 0.02, done: false });
+    } else {
+      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      obstacles.push({ type: "sardine", el: el, lane: -0.7 + Math.random() * 1.4,
+        p: 0.0, vp: 0.085 + Math.random() * 0.02, done: false, bob: Math.random() * 6.28 });
+    }
   }
-  function makePanel(side, el) {
-    const buff = el.kind === "buff";
-    const base = 2 + ((Math.random() * 5) | 0);   // 시작 숫자 ±(2~6)
-    return {
-      side: side, el: el,
-      count: buff ? base : -base,
-      goal: 10,            // 안전 게이트를 이만큼 채우면 폭발 + 아이템
-      bursted: false,
-    };
-  }
-  function burstPanel(pr, panel) {
-    panel.bursted = true;
-    const g = panelGeom(pr, panel.side);
-    spawnParticles(g.cx, g.cy, panel.el.color, 24, 240);
-    spawnParticles(g.cx, g.cy, "#ffffff", 14, 280);
-    spawnItem(g.cx, g.cy);
-    runCoins += 5;
-    shake = Math.min(16, shake + 11);
-    hitStop = 0.06; SND.explode();
-    learned[panel.el.symbol] = true;
-    showToast("💥 " + panel.el.symbol + " " + panel.el.name + " 폭발! 아이템 획득!", false);
+
+  // 원소 효과 적용(sign +1 = 강화, -1 = 페널티)
+  function applyElementEffect(el, sign) {
+    const v = Math.max(1, Math.abs(el.value));
+    switch (el.effect) {
+      case "squad":    player.squad = Math.max(0, player.squad + sign * v); break;
+      case "weapon":   player.weapon = Math.max(1, Math.min(30, player.weapon + sign * v)); break;
+      case "firerate": player.fireRate = Math.max(1, Math.min(12, player.fireRate + sign * v)); break;
+      case "shield":   player.shield = Math.max(0, player.shield + sign * v); break;
+      case "bomb": {
+        let kills = v * 4;
+        enemies.sort(function (a, b) { return b.p - a.p; });
+        while (kills-- > 0 && enemies.length) killEnemy(0);
+        shake = Math.min(16, shake + 10);
+        break;
+      }
+      case "score":    score += sign * Math.abs(el.value) * 2; break;
+    }
+    const icon = { squad: "🐧", weapon: "🔫", firerate: "⚡", shield: "🛡", bomb: "💥", score: "⭐" }[el.effect] || "";
+    const mag = el.effect === "score" ? Math.abs(el.value) * 2 : v;
+    spawnText(player.x, playerLineY() - player.jumpY - 44, (sign > 0 ? "+" : "−") + mag + " " + icon,
+      sign > 0 ? "#aef0c0" : "#ff8a8a", 22);
   }
 
   // ===================== 업데이트 =====================
@@ -353,6 +349,13 @@
     player.y = playerLineY();
     player.bob += dt * 9;
 
+    // 점프 물리(jumpY = 바닥에서 떠오른 높이, px)
+    if (!player.onGround) {
+      player.jumpY += player.vz * dt;
+      player.vz -= 1700 * dt;            // 중력
+      if (player.jumpY <= 0) { player.jumpY = 0; player.vz = 0; player.onGround = true; }
+    }
+
     const fireInterval = Math.max(0.08, 0.42 - player.fireRate * 0.03);
     fireTimer -= dt;
     if (fireTimer <= 0) { fireTimer = fireInterval; fireVolley(); }
@@ -365,14 +368,14 @@
     // 보스 웨이브
     if (!boss && elapsed >= bossNextAt) spawnBoss();
 
-    gateTimer -= dt;
-    if (gateTimer <= 0) { gateTimer = 5.5; spawnGatePair(); }
+    obsTimer -= dt;
+    if (obsTimer <= 0) { obsTimer = Math.max(1.1, 2.3 - elapsed * 0.01); spawnObstacle(); }
 
     updateBullets(dt);
     updateEnemies(dt);
     updateEBullets(dt);
     if (boss) updateBoss(dt);
-    updateGates(dt);
+    updateObstacles(dt);
     updateItems(dt);
     updateParticles(dt);
     updateTexts(dt);
@@ -439,34 +442,6 @@
 
       const bx = laneToX(b.p, b.lane);
       const by = projY(b.p);
-      let hit = false;
-
-      // 게이트(원근 벽) 충돌 → 숫자 키우기 / 폭발
-      for (const pr of gates) {
-        if (pr.applied) continue;
-        const gBot = projY(pr.p), gTop = gBot - gateWallH(pr.p);
-        if (by <= gBot && by >= gTop) {
-          const half = halfAt(pr.p), vx = W / 2;
-          let side = 0;
-          if (bx >= vx - half && bx < vx) side = -1;
-          else if (bx > vx && bx <= vx + half) side = 1;
-          if (side !== 0) {
-            const panel = pr.panels[0].side === side ? pr.panels[0] : pr.panels[1];
-            if (!panel.bursted) {
-              if (panel.el.kind === "buff") {
-                panel.count = Math.min(40, panel.count + 1);
-                if (panel.count >= panel.goal) burstPanel(pr, panel);
-              } else {
-                panel.count = Math.max(-40, panel.count - 1);
-              }
-              spawnParticles(bx, by, panel.el.color, 4, 90);
-              hit = true;
-            }
-          }
-        }
-        if (hit) break;
-      }
-      if (hit) { bullets.splice(i, 1); continue; }
 
       // 보스 충돌
       if (boss) {
@@ -664,50 +639,67 @@
     updateHUD();
   }
 
-  function updateGates(dt) {
-    for (let i = gates.length - 1; i >= 0; i--) {
-      const pr = gates[i];
-      pr.p += pr.vp * (0.45 + pr.p * 1.0) * dt;   // 가까울수록 빠르게
-      if (!pr.applied && pr.p >= 1) {
-        pr.applied = true;
-        const side = player.x < W / 2 ? -1 : 1;
-        const panel = pr.panels[0].side === side ? pr.panels[0] : pr.panels[1];
-        if (!panel.bursted) applyGate(panel);
+  function updateObstacles(dt) {
+    const AIRBORNE = 18;   // 이 높이 이상 떠 있으면 점프 중으로 판정
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      o.p += o.vp * (0.45 + o.p * 1.0) * dt;   // 가까울수록 빠르게
+      if (o.type === "sardine") o.bob += dt * 6;
+
+      if (!o.done && o.p >= 1) {
+        o.done = true;
+        const ox = laneToX(1, o.lane);
+        if (o.type === "trap") hitTrap(o, ox);
+        else collectSardine(o, ox, AIRBORNE);
       }
-      if (pr.p > 1.08) gates.splice(i, 1);
+      if (o.p > 1.1) obstacles.splice(i, 1);
     }
   }
 
-  function applyGate(panel) {
-    const el = panel.el;
-    const sign = el.kind === "buff" ? 1 : -1;
-    const n = Math.abs(panel.count);
+  // 함정: 점프로 넘으면 안전(+학습), 못 넘으면 페널티
+  function hitTrap(o, ox) {
+    const el = o.el;
     learned[el.symbol] = true;
-
-    switch (el.effect) {
-      case "squad":    player.squad = Math.max(0, player.squad + sign * n); break;
-      case "weapon":   player.weapon = Math.max(1, Math.min(30, player.weapon + sign * n)); break;
-      case "firerate": player.fireRate = Math.max(1, Math.min(12, player.fireRate + sign * n)); break;
-      case "shield":   player.shield = Math.max(0, player.shield + sign * n); break;
-      case "bomb": {
-        let kills = n * 3;
-        enemies.sort(function (a, b) { return b.p - a.p; });
-        while (kills-- > 0 && enemies.length) killEnemy(0);
-        shake = Math.min(16, shake + 10);
-        break;
-      }
-      case "score":    score += sign * n * 300; break;
+    if (player.jumpY > 18) {
+      // 점프 회피 성공
+      score += 30; runCoins += 1;
+      spawnText(player.x, playerLineY() - player.jumpY - 40, "점프 회피! +30", "#aef0c0", 18);
+      spawnParticles(player.x, playerLineY(), "#bfe6ff", 8, 150);
+      showToast(el.symbol + " " + el.name + " — " + el.fact, true);
+      SND.item();
+    } else {
+      // 함정에 빠짐 → 페널티
+      applyElementEffect(el, -1);
+      spawnParticles(ox, playerLineY(), "#9ab8d0", 16, 220);
+      combo = 0; lineFlash = 0.5; screenFlash = 0.32;
+      shake = Math.min(18, shake + 11);
+      SND.breach();
+      showToast("⚠ " + el.symbol + " " + el.name + " — " + el.fact, true);
     }
-
-    // 효과를 펭귄 위에 떠오르는 텍스트로
-    const icon = { squad: "🐧", weapon: "🔫", firerate: "⚡", shield: "🛡", bomb: "💥", score: "⭐" }[el.effect] || "";
-    const label = (sign > 0 ? "+" : "−") + n + " " + icon;
-    spawnText(player.x, playerLineY() - 40, label, sign > 0 ? "#aef0c0" : "#ff8a8a", 22);
-
-    showToast(el.symbol + " " + el.name + " — " + el.fact, el.kind === "trap");
-    spawnParticles(player.x, playerLineY() - 10, el.color, 16, 180);
     updateHUD();
     if (player.squad <= 0) gameOver();
+  }
+
+  // 정어리: 땅에서 가까이 있으면 줍기(강화+학습), 점프 중이면 놓침
+  function collectSardine(o, ox, AIRBORNE) {
+    const n = Math.min(player.squad, 7);
+    const catchR = 40 + Math.min(120, 18 + n * 12) / 2;
+    if (player.jumpY <= AIRBORNE && Math.abs(player.x - ox) < catchR) {
+      const el = o.el;
+      learned[el.symbol] = true;
+      applyElementEffect(el, 1);
+      player.fish++;
+      runCoins += 2; score += 50;
+      spawnParticles(ox, playerLineY() - 12, el.color, 14, 180);
+      SND.fish();
+      // 정어리 10마리마다 펭귄 +1
+      if (player.fish % 10 === 0) {
+        player.squad++;
+        spawnText(player.x, playerLineY() - 64, "정어리 10마리! 🐧+1", "#ffe678", 18);
+      }
+      showToast(el.symbol + " " + el.name + " — " + el.fact, false);
+    }
+    updateHUD();
   }
 
   // ---------- 보너스 아이템 ----------
@@ -815,7 +807,7 @@
     drawBackground();
 
     if (state === STATE.PLAY || state === STATE.OVER) {
-      drawGates();
+      drawObstacles();
       drawEnemies();
       if (boss) drawBoss();
       drawBullets();
@@ -1029,19 +1021,29 @@
   function drawPlayer() {
     const n = Math.min(player.squad, 7);
     const spread = Math.min(120, 18 + n * 12);
+    const lift = player.jumpY;
+    const shS = 1 - Math.min(0.55, lift / 150);   // 점프하면 그림자 작아짐
+    // 바닥 그림자(점프해도 땅에 남음)
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      const x = player.x - spread / 2 + spread * t;
+      ctx.fillStyle = "rgba(40,80,120," + (0.22 * shS) + ")";
+      ctx.beginPath(); ctx.ellipse(x, player.y + 6, 12 * shS, 4 * shS, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // 펭귄(점프 높이만큼 위로)
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0.5 : i / (n - 1);
       const x = player.x - spread / 2 + spread * t;
       const phase = player.bob + i * 1.3;
       const bob = Math.abs(Math.sin(phase)) * 1.5;
-      drawPenguinBack(x, player.y + bob, 1.12, i === Math.floor(n / 2), phase);
+      drawPenguinBack(x, player.y - lift + bob, 1.12, i === Math.floor(n / 2), phase);
     }
     if (player.shield > 0) {
       ctx.save();
       ctx.strokeStyle = "rgba(120, 220, 255, 0.7)";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(player.x, player.y - 8, spread / 2 + 22, Math.PI * 0.92, Math.PI * 2.08);
+      ctx.arc(player.x, player.y - lift - 8, spread / 2 + 22, Math.PI * 0.92, Math.PI * 2.08);
       ctx.stroke();
       ctx.restore();
     }
@@ -1058,10 +1060,6 @@
     ctx.translate(x, y);
     ctx.rotate(wad);
     ctx.scale(s, s);
-
-    // 그림자
-    ctx.fillStyle = "rgba(40, 80, 120, 0.22)";
-    ctx.beginPath(); ctx.ellipse(0, 6, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
 
     // 발(번갈아 듦)
     ctx.fillStyle = "#f5a623";
@@ -1375,61 +1373,102 @@
     ctx.textAlign = "start";
   }
 
-  function drawGates() {
-    ctx.textAlign = "center";
-    const sorted = gates.slice().sort(function (a, b) { return a.p - b.p; });  // 먼 것부터
-    for (const pr of sorted) {
-      for (const panel of pr.panels) {
-        if (panel.bursted) continue;
-        const isBuff = panel.el.kind === "buff";
-        const g = panelGeom(pr, panel.side);
-        const wallW = g.x1 - g.x0, wallH = g.baseY - g.topY;
-
-        // 바닥 그림자(서 있는 느낌)
-        ctx.fillStyle = "rgba(20, 50, 80, 0.25)";
-        ctx.beginPath();
-        ctx.ellipse(g.cx, g.baseY, wallW * 0.45, 5 * g.scale, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 세로 벽(빌보드)
-        const grad = ctx.createLinearGradient(0, g.topY, 0, g.baseY);
-        if (isBuff) { grad.addColorStop(0, "rgba(120, 210, 255, 0.55)"); grad.addColorStop(1, "rgba(30, 110, 200, 0.7)"); }
-        else { grad.addColorStop(0, "rgba(255, 150, 150, 0.55)"); grad.addColorStop(1, "rgba(170, 45, 55, 0.7)"); }
-        ctx.fillStyle = grad;
-        ctx.fillRect(g.x0, g.topY, wallW, wallH);
-
-        // 기둥 + 상단 광택
-        ctx.strokeStyle = isBuff ? "rgba(170, 230, 255, 0.95)" : "rgba(255, 160, 160, 0.95)";
-        ctx.lineWidth = Math.max(1.5, 3 * g.scale);
-        ctx.strokeRect(g.x0, g.topY, wallW, wallH);
-        ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillRect(g.x0, g.topY, wallW, Math.max(3, 7 * g.scale));
-
-        // 폭발 게이지(안전 게이트, 벽 상단)
-        if (isBuff) {
-          const prog = Math.min(1, panel.count / panel.goal);
-          const bw = wallW * 0.7, bh = Math.max(3, 5 * g.scale);
-          const bx = g.cx - bw / 2, byy = g.topY + 5 * g.scale;
-          ctx.fillStyle = "rgba(0,0,0,0.4)";
-          ctx.fillRect(bx, byy, bw, bh);
-          ctx.fillStyle = prog >= 1 ? "#fff09a" : "#ffe678";
-          ctx.fillRect(bx, byy, bw * prog, bh);
-        }
-
-        // 큰 숫자(+N / −N)
-        const fs = Math.max(13, 32 * g.scale);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold " + fs + "px sans-serif";
-        const num = (panel.count >= 0 ? "+" : "−") + Math.abs(panel.count);
-        ctx.fillText(num, g.cx, g.cy + fs * 0.35);
-
-        // 이름(벽 아래)
-        ctx.fillStyle = "#eaf6ff";
-        ctx.font = Math.max(8, 12 * g.scale) + "px sans-serif";
-        ctx.fillText(panel.el.symbol + " " + panel.el.name, g.cx, g.baseY - 5 * g.scale);
-      }
+  function drawObstacles() {
+    const sorted = obstacles.slice().sort(function (a, b) { return a.p - b.p; });  // 먼 것부터
+    for (const o of sorted) {
+      if (o.type === "trap") drawTrap(o);
+      else drawSardine(o);
     }
+  }
+
+  // 원소 배지(원형 칩 + 기호)
+  function drawElementBadge(x, y, r, el, danger) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = danger ? "rgba(180,45,55,0.95)" : "rgba(40,120,205,0.95)";
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, r * 0.12);
+    ctx.strokeStyle = danger ? "#ffc0c0" : "#bfe8ff";
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.font = "bold " + (r * 1.05) + "px sans-serif";
+    ctx.fillText(el.symbol, x, y + r * 0.36);
     ctx.textAlign = "start";
+    ctx.restore();
+  }
+
+  // 함정: 빙판을 가로지르는 크레바스(구멍) + 위험 원소 배지
+  function drawTrap(o) {
+    const sc = projScale(o.p);
+    const y = projY(o.p);
+    const half = halfAt(o.p);
+    const cx = W / 2;
+    const ry = 11 * sc + 5;
+
+    ctx.save();
+    // 구멍(깊이 그라데이션)
+    const g = ctx.createRadialGradient(cx, y, 2, cx, y, half);
+    g.addColorStop(0, "rgba(0,0,0,0.92)");
+    g.addColorStop(0.7, "rgba(10,30,55,0.8)");
+    g.addColorStop(1, "rgba(30,70,110,0.35)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx, y, half * 0.96, ry, 0, 0, Math.PI * 2); ctx.fill();
+    // 깨진 얼음 가장자리
+    ctx.strokeStyle = "rgba(205,238,255,0.85)";
+    ctx.lineWidth = Math.max(1.5, 2.5 * sc);
+    ctx.beginPath(); ctx.ellipse(cx, y, half * 0.96, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    // 톱니 얼음조각
+    ctx.fillStyle = "rgba(225,245,255,0.9)";
+    for (let k = -3; k <= 3; k++) {
+      const px = cx + k * half * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(px - 4 * sc, y - ry); ctx.lineTo(px, y - ry - 6 * sc); ctx.lineTo(px + 4 * sc, y - ry);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    // 위험 원소 배지(구멍 위에 떠 있음)
+    drawElementBadge(cx, y - ry - 22 * sc - 8, 16 * sc + 9, o.el, true);
+    // 경고
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "#ff8a8a"; ctx.textAlign = "center";
+    ctx.font = "bold " + (10 * sc + 7) + "px sans-serif";
+    ctx.fillText("⚠ 점프!", cx, y - ry - 22 * sc - 8 - (16 * sc + 9) - 5);
+    ctx.textAlign = "start"; ctx.restore();
+  }
+
+  // 정어리: 은빛 물고기 + 안전 원소 배지
+  function drawSardine(o) {
+    const sc = projScale(o.p);
+    const x = laneToX(o.p, o.lane);
+    const y = projY(o.p) - (8 + Math.sin(o.bob) * 3) * sc;
+    const L = 16 * sc + 7;
+
+    // 바닥 그림자
+    ctx.fillStyle = "rgba(40,80,120,0.18)";
+    ctx.beginPath(); ctx.ellipse(x, projY(o.p), L * 0.8, 3 * sc + 1.5, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(x, y);
+    // 꼬리
+    ctx.fillStyle = "#7fa8c4";
+    ctx.beginPath(); ctx.moveTo(L * 0.8, 0); ctx.lineTo(L * 1.35, -L * 0.45); ctx.lineTo(L * 1.35, L * 0.45); ctx.closePath(); ctx.fill();
+    // 몸통(은빛)
+    const fg = ctx.createLinearGradient(0, -L * 0.5, 0, L * 0.5);
+    fg.addColorStop(0, "#e6f2fb"); fg.addColorStop(0.5, "#bcd6e8"); fg.addColorStop(1, "#86aac6");
+    ctx.fillStyle = fg; ctx.strokeStyle = "rgba(40,70,100,0.5)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.beginPath(); ctx.ellipse(0, 0, L, L * 0.52, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 옆줄 + 지느러미
+    ctx.strokeStyle = "rgba(90,140,180,0.6)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.beginPath(); ctx.moveTo(-L * 0.5, 0); ctx.lineTo(L * 0.6, 0); ctx.stroke();
+    // 눈
+    ctx.fillStyle = "#10202b"; ctx.beginPath(); ctx.arc(-L * 0.55, -L * 0.1, L * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // 안전 원소 배지(물고기 위)
+    drawElementBadge(x, y - L - 12 * sc, 13 * sc + 8, o.el, false);
   }
 
   function drawParticles() {
