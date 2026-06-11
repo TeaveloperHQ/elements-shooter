@@ -429,7 +429,7 @@
           o.cleared = true;
           const big = o.len > 0.1;
           score += big ? 80 : 5; runCoins += big ? 2 : 1;
-          spawnText(player.x, playerLineY() - player.jumpY - 36, big ? "건넜다!" : "점프!", "#aef0c0", big ? 22 : 18);
+          if (big) spawnText(player.x, playerLineY() - player.jumpY - 36, "건넜다!", "#aef0c0", 22);
         }
         if (backP > 1.06) items.splice(i, 1);
         continue;
