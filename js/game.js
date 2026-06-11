@@ -31,6 +31,36 @@
   }
   window.addEventListener("resize", resize);
 
+  // ===================== 사운드(WebAudio 간이 신스) =====================
+  let actx = null;
+  function initAudio() {
+    if (actx) return;
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { actx = null; }
+  }
+  // 한 음 재생(주파수, 길이, 파형, 음량, 끝주파수=슬라이드)
+  function beep(freq, dur, type, vol, freqEnd) {
+    if (!actx) return;
+    const t = actx.currentTime;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type || "square";
+    o.frequency.setValueAtTime(freq, t);
+    if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + dur);
+    g.gain.setValueAtTime(vol || 0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + dur);
+  }
+  const SND = {
+    kill: function () { beep(440, 0.07, "square", 0.035, 660); },
+    explode: function () { beep(150, 0.28, "sawtooth", 0.08, 50); },
+    breach: function () { beep(110, 0.22, "sawtooth", 0.09, 45); },
+    boss: function () { beep(70, 0.5, "sawtooth", 0.10, 110); },
+    item: function () { beep(680, 0.10, "triangle", 0.06, 1020); },
+    combo: function (n) { beep(520 + n * 40, 0.06, "square", 0.04, 760 + n * 40); },
+  };
+
   // ===================== 원근(perspective) 좌표 =====================
   // p(깊이): 0 = 지평선(멀다, 작다), 1 = 플레이어 라인(가깝다, 크다)
   function horizonY() { return H * 0.30; }
@@ -75,6 +105,8 @@
   let screenFlash = 0;   // 피격 시 화면 빨강 플래시
   let boss = null;       // 현재 보스(없으면 null)
   let bossNextAt = 0;    // 다음 보스 등장 시각(초)
+  let combo = 0, comboTimer = 0;   // 연속 처치 콤보
+  let hitStop = 0;       // 큰 이벤트 시 짧은 정지(손맛)
 
   let snow = [];
   let bergs = [];
@@ -95,6 +127,9 @@
     eBullets = [];
     boss = null;
     bossNextAt = 35;
+    combo = 0;
+    comboTimer = 0;
+    hitStop = 0;
     score = 0;
     learned = {};
     spawnTimer = 0;
@@ -140,6 +175,8 @@
   document.getElementById("retry-btn").addEventListener("click", startGame);
 
   function startGame() {
+    initAudio();
+    if (actx && actx.state === "suspended") actx.resume();
     newGame();
     state = STATE.PLAY;
     startScreen.classList.add("hidden");
@@ -207,6 +244,7 @@
     spawnParticles(g.cx, g.cy, "#ffffff", 14, 280);
     spawnItem(g.cx, g.cy);
     shake = Math.min(16, shake + 11);
+    hitStop = 0.06; SND.explode();
     learned[panel.el.symbol] = true;
     showToast("💥 " + panel.el.symbol + " " + panel.el.name + " 폭발! 아이템 획득!", false);
   }
@@ -218,6 +256,7 @@
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
     if (lineFlash > 0) lineFlash = Math.max(0, lineFlash - dt);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
+    if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
 
     const speed = 560;
     if (keyLeft) player.targetX -= speed * dt;
@@ -384,14 +423,22 @@
     }
   }
 
+  function comboMult() { return 1 + Math.floor(combo / 5); }   // 5연속마다 +1배
+
   function killEnemy(j) {
     const e = enemies[j];
     const ex = laneToX(e.p, e.lane), ey = projY(e.p);
     spawnParticles(ex, ey, "#bfe6ff", e.big ? 18 : 10, 160);
     spawnParticles(ex, ey, "#ffffff", e.big ? 10 : 5, 200);
-    const pts = e.kind === "tank" ? 30 : (e.kind === "shard" ? 5 : 10);
+    // 콤보: 연속 처치할수록 배율 ↑
+    combo++; comboTimer = 2.2;
+    const mult = comboMult();
+    const base = e.kind === "tank" ? 30 : (e.kind === "shard" ? 5 : 10);
+    const pts = base * mult;
     score += pts;
-    spawnText(ex, ey - e.r * projScale(e.p), "+" + pts, "#eaffd0", e.big ? 16 : 13);
+    spawnText(ex, ey - e.r * projScale(e.p), "+" + pts, mult > 1 ? "#ffe678" : "#eaffd0", e.big ? 16 : 13);
+    SND.kill();
+    if (combo > 1 && combo % 5 === 0) SND.combo(combo / 5);
     enemies.splice(j, 1);
 
     // 분열형: 죽으면 작은 파편 2마리로 쪼개짐
@@ -431,6 +478,7 @@
           spawnParticles(bx, playerLineY(), "#ff8a8a", 16, 220);
           screenFlash = 0.35;
         }
+        combo = 0; SND.breach();
         lineFlash = 0.5;
         shake = Math.min(18, shake + 11);
         enemies.splice(i, 1);
@@ -458,6 +506,7 @@
           screenFlash = 0.3;
         }
         spawnParticles(bx, playerLineY(), "#9ab8d0", 12, 200);
+        combo = 0; SND.breach();
         lineFlash = 0.45; shake = Math.min(16, shake + 9);
         eBullets.splice(i, 1);
         if (player.squad <= 0) { player.squad = 0; updateHUD(); gameOver(); return; }
@@ -476,6 +525,7 @@
     showToast("❄ 빙하의 군주 등장! 집중 사격!", true);
     shake = Math.min(20, shake + 14);
     screenFlash = 0.25;
+    SND.boss();
   }
   function updateBoss(dt) {
     boss.p += boss.vp * (0.6 + boss.p * 0.5) * dt;
@@ -498,6 +548,7 @@
       player.squad -= dmg;
       spawnText(laneToX(1, boss.lane), playerLineY() - 26, "-" + dmg + " 🐧", "#ff5a5a", 26);
       spawnParticles(laneToX(1, boss.lane), playerLineY(), "#ff8a8a", 24, 260);
+      combo = 0; SND.breach();
       lineFlash = 0.6; screenFlash = 0.45; shake = Math.min(22, shake + 16);
       boss.p = 0.55;
       updateHUD();
@@ -515,6 +566,7 @@
     spawnItem(player.x, playerLineY() - 50);
     spawnItem(player.x - 40, playerLineY() - 50);
     shake = Math.min(24, shake + 18); screenFlash = 0.5;
+    hitStop = 0.14; SND.explode();
     boss = null;
     bossNextAt = elapsed + 40;
     updateHUD();
@@ -577,6 +629,7 @@
       while (kills-- > 0 && enemies.length) killEnemy(0);
       shake = Math.min(16, shake + 10); spawnText(x, y - 24, "폭탄!", "#ffd070", 16);
     } else { type = "score"; label = "⭐"; score += 800; spawnText(x, y - 24, "+800", "#ffe678", 16); }
+    SND.item();
     items.push({ x: x, y: y, life: 1.0, label: label, type: type });
   }
   function updateItems(dt) {
@@ -712,6 +765,21 @@
       ctx.strokeRect(m, y, bw, bh);
       ctx.textAlign = "start";
     }
+    // 콤보 표시(3연속부터)
+    if (state === STATE.PLAY && combo >= 3) {
+      const mult = comboMult();
+      const a = Math.min(1, comboTimer / 2.2);
+      ctx.textAlign = "center";
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#ffe678";
+      ctx.font = "bold 26px sans-serif";
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      const s = combo + " 콤보!" + (mult > 1 ? "  x" + mult : "");
+      ctx.strokeText(s, W / 2, H * 0.34);
+      ctx.fillText(s, W / 2, H * 0.34);
+      ctx.globalAlpha = 1; ctx.textAlign = "start";
+    }
+
     // 펭귄이 적을 때 위험 비네팅 + 경고
     if (state === STATE.PLAY && player && player.squad <= 2) {
       const pulse = 0.22 + (Math.sin(elapsed * 6) * 0.5 + 0.5) * 0.18;
@@ -1211,7 +1279,10 @@
   function loop(ts) {
     const dt = lastT ? Math.min(0.05, (ts - lastT) / 1000) : 0;
     lastT = ts;
-    if (state === STATE.PLAY) update(dt);
+    if (state === STATE.PLAY) {
+      if (hitStop > 0) hitStop = Math.max(0, hitStop - dt);  // 짧은 정지(손맛)
+      else update(dt);
+    }
     render();
     requestAnimationFrame(loop);
   }
