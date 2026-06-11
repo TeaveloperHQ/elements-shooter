@@ -99,6 +99,7 @@
   function stageIndex() { return Math.min(STAGES.length - 1, Math.floor(distance / STAGE_LEN)); }
   function stageLandmark() { return STAGES[stageIndex()]; }
   let snow = [], bergs = [], scenery = [], stars = [], iceFx = [];
+  let galleryMode = false;
 
   // ===================== 메타(영구 저장) =====================
   const UPGRADE_MAX = 8;
@@ -1146,20 +1147,24 @@
     const sc = projScale(o.p);
     const x = laneToX(o.p, o.lane), gy = projY(o.p);
     drawCatchMarker(x, gy, sc, o);
-    const cw = 24 * sc, ch = 17 * sc;
+    const cw = 26 * sc, ch = 18 * sc;
     const top = gy - ch - (3 + Math.sin(o.wave) * 2) * sc;
     ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, cw * 0.5, 2.5 * sc, 0, 0, Math.PI * 2); ctx.fill();
     // 몸통(은색)
     const g = ctx.createLinearGradient(x - cw / 2, 0, x + cw / 2, 0);
-    g.addColorStop(0, "#8fa3b5"); g.addColorStop(0.5, "#f0f6fb"); g.addColorStop(1, "#8fa3b5");
+    g.addColorStop(0, "#8093a5"); g.addColorStop(0.45, "#f4f9fd"); g.addColorStop(0.6, "#e6eef6"); g.addColorStop(1, "#7e92a4");
     ctx.fillStyle = g; ctx.fillRect(x - cw / 2, top, cw, ch);
+    // 세로 광택
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(x - cw * 0.34, top, cw * 0.1, ch);
     // 라벨 밴드 + 원소 기호
     ctx.fillStyle = "#2f8fe0"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.5);
+    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.08);
     ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (ch * 0.42) + "px sans-serif";
     ctx.fillText(o.el.symbol, x, top + ch * 0.62);
     // 뚜껑(타원) + 림
-    ctx.fillStyle = "#e3edf5"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = Math.max(1, sc);
+    ctx.fillStyle = "#eef4fa"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = Math.max(1, sc);
     ctx.beginPath(); ctx.ellipse(x, top, cw / 2, 3 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.ellipse(x - cw * 0.18, top - 0.5 * sc, cw * 0.16, 1.4 * sc, 0, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(x, top + ch, cw / 2, 3 * sc, 0, 0, Math.PI); ctx.stroke();
     ctx.textAlign = "start";
   }
@@ -1371,7 +1376,7 @@
   function loop(ts) {
     const dt = lastT ? Math.min(0.05, (ts - lastT) / 1000) : 0;
     lastT = ts;
-    if (state === STATE.PLAY) update(dt);
+    if (state === STATE.PLAY && !galleryMode) update(dt);
     render();
     requestAnimationFrame(loop);
   }
@@ -1384,5 +1389,18 @@
   // 스크린샷/디버그용: ?auto 면 자동 시작
   if (location.search.indexOf("auto") >= 0 || location.hash.indexOf("auto") >= 0) {
     setTimeout(startGame, 30);
+  }
+  // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
+  if (location.search.indexOf("gallery") >= 0) {
+    startGame(); state = STATE.PLAY; galleryMode = true;
+    player.energy = 72;
+    items = [
+      { type: "can", el: BUFF_ELEMENTS[0], lane: -0.55, p: 0.42, vp: 0, done: false, wave: 0.5 },
+      { type: "can", el: BUFF_ELEMENTS[2], lane: 0.55, p: 0.30, vp: 0, done: false, wave: 2.0 },
+      { type: "opener", lane: 0.05, p: 0.62, vp: 0, done: false, wave: 1.0 },
+      { type: "hole", lane: -0.4, p: 0.5, vp: 0, len: 0.03, w: 0.5, shape: makeJagged(), done: false, cleared: false },
+      { type: "hole", lane: 0, p: 0.93, vp: 0, len: 0.28, w: 1.0, shape: makeJagged(), done: false, cleared: false },
+    ];
+    stored = [{ symbol: "Fe", name: "철", color: "#9aa7b0" }, { symbol: "Cu", name: "구리", color: "#d98f5a" }, { symbol: "Au", name: "금", color: "#e8c349" }];
   }
 })();
