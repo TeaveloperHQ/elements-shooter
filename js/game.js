@@ -250,7 +250,7 @@
   function spawnObstacle() {
     let r = Math.random();
     // 거대 협곡이 떠 있는 동안엔 보통 크레바스를 겹쳐 내보내지 않음
-    if (r < 0.35 && items.some(function (o) { return o.type === "hole" && o.len > 0.1; })) r = 0.6;
+    if (r < 0.35 && items.some(function (o) { return o.canyon; })) r = 0.6;
     if (r < 0.35) {
       // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능 (큰 협곡은 스테이지 끝에만)
       const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
@@ -270,8 +270,8 @@
 
   // 거대 협곡(스테이지 끝) — 길을 가로지름. 점프로는 못 넘고 에너지 모아 비행으로 건너야 함
   function spawnCanyon() {
-    items.push({ type: "hole", lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
-      w: 1.25, len: 0.13 + Math.random() * 0.04, shape: makeJagged() });
+    items.push({ type: "hole", canyon: true, lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
+      w: 1.3, len: 0.08, shape: makeJagged() });
     showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
   }
   // 협곡 전 보급 아이템(중앙 근처에 배치해 줍기 쉽게)
@@ -410,7 +410,7 @@
       // ----- 크레바스: 길이(len)만큼 플레이어 선을 지나가는 동안 계속 판정 -----
       if (o.type === "hole") {
         const frontP = o.p, backP = o.p - o.len;
-        const big = o.len > 0.1;
+        const big = !!o.canyon;
         const overLine = backP <= 1 && frontP >= 1;          // 플레이어 선이 구덩이 위
         if (overLine && player.onGround) {
           const ox = laneToX(1, o.lane), holeHalf = halfAt(1) * o.w;
@@ -429,7 +429,7 @@
         }
         if (!o.cleared && backP > 1) {                        // 무사 통과
           o.cleared = true;
-          const big = o.len > 0.1;
+          const big = !!o.canyon;
           score += big ? 80 : 5; runCoins += big ? 2 : 1;
           if (big) spawnText(player.x, playerLineY() - player.jumpY - 36, "건넜다!", "#aef0c0", 22);
         }
@@ -1202,8 +1202,7 @@
   }
 
   function drawHole(o) {
-    if (o.len <= 0.1) { drawCrevasse(o); return; }   // 보통: 랜덤 들쭉날쭉
-    drawCanyon(o);                                     // 큰 협곡: 가로지르는 띠
+    if (o.canyon) drawCanyon(o); else drawCrevasse(o);
   }
 
   // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
@@ -1240,24 +1239,33 @@
     ctx.restore();
   }
 
+  // 구멍 기하: 판정 구간 [o.p-len, o.p]의 중심에 앵커, 구간을 세로로 덮음(판정=렌더 일치)
+  function holeGeom(o, flat) {
+    const backP = Math.max(0.02, o.p - o.len);
+    const pC = Math.max(0.04, o.p - o.len / 2);
+    const sc = projScale(pC), cx = laneToX(pC, o.lane);
+    const yNear = projY(o.p), yFar = projY(backP);
+    const cy = (yNear + yFar) / 2;
+    const rx = halfAt(pC) * o.w;
+    const ry = Math.max(rx * flat, (yNear - yFar) * 0.5);   // 최소한 판정 구간만큼은 덮음
+    return { cx, cy, rx, ry, sc };
+  }
+
   function drawCrevasse(o) {
-    const sc = projScale(o.p), y = projY(o.p), cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * o.w, ry = rx * 0.26;
-    drawIceHole(cx, y, rx, ry, sc, o.shape);
+    const G = holeGeom(o, 0.26);
+    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape);
     ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
-    ctx.font = "bold " + (9 * sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", cx, y - ry - 8 * sc);
+    ctx.font = "bold " + (9 * G.sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", G.cx, G.cy - G.ry - 8 * G.sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
-  // 거대 협곡 = 기존 크레바스를 좌우로 넓힌 것(같은 위치/스타일, 폭만 큼)
+  // 거대 협곡 = 좌우로 넓힌 크레바스(판정 구간 중심에 맞춰 그림)
   function drawCanyon(o) {
-    const sc = projScale(o.p), y = projY(o.p), cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * o.w;        // o.w가 커서 도로 밖까지 넓음
-    const ry = rx * 0.16;                // 넓고 납작
-    drawIceHole(cx, y, rx, ry, sc, o.shape);
+    const G = holeGeom(o, 0.15);
+    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape);
     ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center"; ctx.fillStyle = "#ffd07a";
-    ctx.font = "bold " + (11 * sc + 6) + "px sans-serif";
-    ctx.fillText("🪽 날아서 건너기!", cx, y - ry - 9 * sc);
+    ctx.font = "bold " + (11 * G.sc + 6) + "px sans-serif";
+    ctx.fillText("🪽 날아서 건너기!", G.cx, G.cy - G.ry - 9 * G.sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
@@ -1593,7 +1601,7 @@
       { type: "can", el: BUFF_ELEMENTS[2], lane: 0.55, p: 0.30, vp: 0, done: false, wave: 2.0 },
       { type: "opener", lane: 0.05, p: 0.62, vp: 0, done: false, wave: 1.0 },
       { type: "hole", lane: -0.4, p: 0.5, vp: 0, len: 0.03, w: 0.5, shape: makeJagged(), done: false, cleared: false },
-      { type: "hole", lane: 0, p: 0.93, vp: 0, len: 0.15, w: 1.25, shape: makeJagged(), done: false, cleared: false },
+      { type: "hole", canyon: true, lane: 0, p: 0.97, vp: 0, len: 0.08, w: 1.3, shape: makeJagged(), done: false, cleared: false },
     ];
     stored = [{ symbol: "Fe", name: "철", color: "#9aa7b0" }, { symbol: "Cu", name: "구리", color: "#d98f5a" }, { symbol: "Au", name: "금", color: "#e8c349" }];
     scenery = [
