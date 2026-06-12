@@ -1261,43 +1261,43 @@
     const sc = projScale(fP), shp = o.shape, n = shp.length;
 
     ctx.save();
-    // 어두운 얼음 밴드(앞↔뒤 사다리꼴)
+    const dY = fy - by;            // 화면상 높이(앞이 아래)
+    // 들쭉날쭉 협곡 외곽선(사방 모두 불규칙)
+    function canyonPath() {
+      const segN = 7;
+      ctx.beginPath();
+      for (let i = 0; i <= segN; i++) { const t = i / segN, x = (fcx - frx) + 2 * frx * t, j = (shp[i % n] - 0.82) * 11 * sc; if (i === 0) ctx.moveTo(x, fy + j); else ctx.lineTo(x, fy + j); }   // 앞(왼→오)
+      for (let i = 1; i <= segN; i++) { const t = i / segN, x = (fcx + frx) + ((bcx + brx) - (fcx + frx)) * t, y = fy + (by - fy) * t, jx = (shp[(i + 2) % n] - 0.82) * 8 * sc * (1 - t * 0.5); ctx.lineTo(x + jx, y); }   // 오른변
+      for (let i = 1; i <= segN; i++) { const t = i / segN, x = (bcx + brx) - 2 * brx * t, j = (shp[(i + 4) % n] - 0.82) * 6 * sc; ctx.lineTo(x, by + j); }   // 뒤(오→왼)
+      for (let i = 1; i < segN; i++) { const t = i / segN, x = (bcx - brx) + ((fcx - frx) - (bcx - brx)) * t, y = by + (fy - by) * t, jx = (shp[(i + 1) % n] - 0.82) * 8 * sc * (0.5 + t * 0.5); ctx.lineTo(x - jx, y); }   // 왼변
+      ctx.closePath();
+    }
+    // 채움(깊이 그라데이션)
     const g = ctx.createLinearGradient(0, by, 0, fy);
-    g.addColorStop(0, "#3f86ad"); g.addColorStop(0.5, "#19567a"); g.addColorStop(1, "#0e3550");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(fcx - frx, fy); ctx.lineTo(fcx + frx, fy);
-    ctx.lineTo(bcx + brx, by); ctx.lineTo(bcx - brx, by);
-    ctx.closePath(); ctx.fill();
-    // 안쪽 깊은 그늘(깊이감)
-    ctx.fillStyle = "rgba(4,18,34,0.45)";
-    ctx.beginPath();
-    ctx.moveTo(fcx - frx * 0.8, fy - (fy - by) * 0.16); ctx.lineTo(fcx + frx * 0.8, fy - (fy - by) * 0.16);
-    ctx.lineTo(bcx + brx * 0.82, by + (fy - by) * 0.1); ctx.lineTo(bcx - brx * 0.82, by + (fy - by) * 0.1);
-    ctx.closePath(); ctx.fill();
-    // 세로 빙벽 결(앞↔뒤를 잇는 얼음 기둥)
-    ctx.strokeStyle = "rgba(150,200,235,0.32)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
-    for (let k = 0; k <= 6; k++) {
-      const f = k / 6;
-      const tx = bcx + (f - 0.5) * 2 * brx * 0.85, bxn = fcx + (f - 0.5) * 2 * frx * 0.85;
-      ctx.beginPath(); ctx.moveTo(tx, by); ctx.lineTo(bxn, fy); ctx.stroke();
-    }
-    // 뒤 가장자리 고드름(아래로)
-    ctx.fillStyle = "rgba(228,246,255,0.85)";
-    for (let k = 0; k <= 6; k++) {
-      const f = (k + 0.5) / 7, tx = bcx + (f - 0.5) * 2 * brx * 0.8, il = (3 + shp[k % n] * 4) * sc;
-      ctx.beginPath(); ctx.moveTo(tx - 2 * sc, by); ctx.lineTo(tx + 2 * sc, by); ctx.lineTo(tx, by + il); ctx.closePath(); ctx.fill();
-    }
-    // 앞 가장자리 들쭉날쭉 얼음 테
-    ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) { const t = i / n; const xx = (fcx - frx) + 2 * frx * t; const j = (shp[i % n] - 0.85) * 6 * sc; if (i === 0) ctx.moveTo(xx, fy + j); else ctx.lineTo(xx, fy + j); }
-    ctx.stroke();
-    // 뒤 가장자리
-    ctx.strokeStyle = "rgba(180,215,240,0.6)"; ctx.lineWidth = Math.max(1, 1.6 * sc);
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) { const t = i / n; const xx = (bcx - brx) + 2 * brx * t; const j = (shp[(i + 3) % n] - 0.85) * 5 * sc; if (i === 0) ctx.moveTo(xx, by + j); else ctx.lineTo(xx, by + j); }
-    ctx.stroke();
+    g.addColorStop(0, "#2f6f95"); g.addColorStop(0.4, "#173f5e"); g.addColorStop(1, "#071d30");
+    ctx.fillStyle = g; canyonPath(); ctx.fill();
+    // 안쪽 디테일(클립)
+    ctx.save(); canyonPath(); ctx.clip();
+    // 뒤쪽 더 깊은 그늘
+    const dg = ctx.createLinearGradient(0, by, 0, by + dY * 0.65);
+    dg.addColorStop(0, "rgba(2,12,24,0.72)"); dg.addColorStop(1, "rgba(2,12,24,0)");
+    ctx.fillStyle = dg; ctx.fillRect(0, by - 6, W, dY * 0.75);
+    // 세로 빙벽 결
+    ctx.strokeStyle = "rgba(150,200,235,0.26)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
+    for (let k = 0; k <= 8; k++) { const f = k / 8, tx = bcx + (f - 0.5) * 2 * brx, bxn = fcx + (f - 0.5) * 2 * frx; ctx.beginPath(); ctx.moveTo(tx, by); ctx.lineTo(bxn, fy); ctx.stroke(); }
+    // 가로 얼음 단(레지)
+    ctx.strokeStyle = "rgba(120,165,200,0.28)"; ctx.lineWidth = Math.max(0.8, sc);
+    for (let k = 1; k <= 3; k++) { const t = k / 4, yy = by + dY * t, cxk = bcx + (fcx - bcx) * t, hk = brx + (frx - brx) * t; ctx.beginPath(); ctx.moveTo(cxk - hk * 0.92, yy); ctx.lineTo(cxk + hk * 0.92, yy); ctx.stroke(); }
+    ctx.restore();
+    // 밝은 깨진 얼음 테(전체 둘레)
+    ctx.strokeStyle = "rgba(230,247,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
+    canyonPath(); ctx.stroke();
+    // 뒤 가장자리 고드름(작게, 아래로)
+    ctx.fillStyle = "rgba(225,245,255,0.82)";
+    for (let k = 0; k <= 7; k++) { const t = (k + 0.5) / 8, xx = (bcx - brx) + 2 * brx * t, il = (2.4 + shp[k % n] * 3) * sc; ctx.beginPath(); ctx.moveTo(xx - 1.8 * sc, by); ctx.lineTo(xx + 1.8 * sc, by); ctx.lineTo(xx, by + il); ctx.closePath(); ctx.fill(); }
+    // 앞 가장자리 서리 알갱이
+    ctx.fillStyle = "rgba(240,250,255,0.85)";
+    for (let k = 0; k < 7; k++) { const t = (k + 0.5) / 7, xx = (fcx - frx) + 2 * frx * t; ctx.beginPath(); ctx.arc(xx, fy + (shp[k % n] - 0.82) * 10 * sc, Math.max(1, 1.4 * sc), 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
 
     // 안내(거대 협곡은 비행 필요)
