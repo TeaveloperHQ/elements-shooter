@@ -933,16 +933,16 @@
     g.addColorStop(0, "#ffffff"); g.addColorStop(0.55, "#dcebf6"); g.addColorStop(1, "#a6c6dd");
     return g;
   }
-  // 2.5D: 같은 도형을 뒤(우상단)로 압출한 어두운 면 + 앞면 → 입체감
-  const LM_SIDE = "rgba(118,156,193,0.97)", LM_TOP = "rgba(208,230,247,0.97)";
+  // 2.5D: 도형을 우상단으로 압출한 깔끔한 측면 슬랩 + 앞면
+  const LM_SIDE = "rgba(118,156,193,0.97)";
   function lmSolid(buildPath, front, u) {
-    const dx = 0.8 * u, dy = -0.52 * u;
-    // 측/상단 압출 면(여러 단계로 깊이감)
-    ctx.fillStyle = LM_SIDE;
-    for (let s = 1; s <= 5; s++) { const t = s / 5; ctx.save(); ctx.translate(dx * t, dy * t); buildPath(); ctx.fill(); ctx.restore(); }
-    ctx.fillStyle = LM_TOP; ctx.save(); ctx.translate(dx, dy); buildPath(); ctx.fill(); ctx.restore();
-    // 앞면
-    ctx.fillStyle = front; buildPath(); ctx.fill(); ctx.stroke();
+    const dx = 0.5 * u, dy = -0.42 * u, N = 8;
+    // 측면 슬랩(뒤→앞 빈틈없이, 단일 톤)
+    ctx.fillStyle = "#8fb0cd";
+    for (let s = N; s >= 1; s--) { const t = s / N; ctx.save(); ctx.translate(dx * t, dy * t); buildPath(); ctx.fill(); ctx.restore(); }
+    // 앞면 + 외곽선
+    ctx.fillStyle = front; buildPath(); ctx.fill();
+    ctx.strokeStyle = "rgba(74,112,150,0.7)"; ctx.lineWidth = Math.max(1, u * 0.055); buildPath(); ctx.stroke();
   }
   function drawLandmark(key, x, y, s, flip) {
     const u = 8 * s;
@@ -1503,18 +1503,12 @@
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
     ctx.beginPath(); ctx.ellipse(0, -8, 12.5, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 통통한 몸
-    // 흰 배 가장자리(양옆 살짝 보임) — 검은 덩어리 느낌 완화
-    ctx.fillStyle = "rgba(244,251,255,0.9)";
-    ctx.beginPath(); ctx.ellipse(-7.8, -6, 2.5, 8, 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(7.8, -6, 2.5, 8, -0.12, 0, Math.PI * 2); ctx.fill();
-    // 등 깃 결(미세 세로 줄)
-    ctx.strokeStyle = "rgba(90,120,150,0.22)"; ctx.lineWidth = 0.6;
-    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 3.2, -18); ctx.lineTo(k * 3.0, -1); ctx.stroke(); }
-    // 등 가운데 솔기(척추)
-    ctx.strokeStyle = "rgba(8,14,20,0.5)"; ctx.lineWidth = 0.7;
-    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 1); ctx.stroke();
-    // 등 림라이트(좌상단 빛)
-    ctx.fillStyle = "rgba(150,185,215,0.28)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7, -0.25, 0, Math.PI * 2); ctx.fill();
+    // 흰 배 가장자리(양옆 깔끔하게 보임)
+    ctx.fillStyle = "rgba(246,252,255,0.95)";
+    ctx.beginPath(); ctx.ellipse(-7.6, -5.5, 2.6, 8.5, 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(7.6, -5.5, 2.6, 8.5, -0.1, 0, Math.PI * 2); ctx.fill();
+    // 등 림라이트(부드러운 광택)
+    ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
     // 날개(날 땐 크게 펄럭)
     ctx.fillStyle = "#0e1a24";
     ctx.save(); ctx.translate(-10.5, -9); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.5, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
