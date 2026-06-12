@@ -248,7 +248,9 @@
     return arr;
   }
   function spawnObstacle() {
-    const r = Math.random();
+    let r = Math.random();
+    // 거대 협곡이 떠 있는 동안엔 보통 크레바스를 겹쳐 내보내지 않음
+    if (r < 0.35 && items.some(function (o) { return o.type === "hole" && o.len > 0.1; })) r = 0.6;
     if (r < 0.35) {
       // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능 (큰 협곡은 스테이지 끝에만)
       const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
@@ -269,7 +271,7 @@
   // 거대 협곡(스테이지 끝) — 길을 가로지름. 점프로는 못 넘고 에너지 모아 비행으로 건너야 함
   function spawnCanyon() {
     items.push({ type: "hole", lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
-      w: 1.0, len: 0.26 + Math.random() * 0.08, shape: makeJagged() });
+      w: 1.25, len: 0.13 + Math.random() * 0.04, shape: makeJagged() });
     showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
   }
   // 협곡 전 보급 아이템(중앙 근처에 배치해 줍기 쉽게)
@@ -1247,18 +1249,15 @@
     ctx.textAlign = "start"; ctx.restore();
   }
 
-  // 거대 협곡 — 크레바스를 옆으로 늘려 길 밖까지 가로지르는 큰 얼음 구멍
+  // 거대 협곡 = 기존 크레바스를 좌우로 넓힌 것(같은 위치/스타일, 폭만 큼)
   function drawCanyon(o) {
-    const pC = Math.max(0.05, o.p - o.len / 2);          // 구멍 가운데 깊이
-    const sc = projScale(pC), cy = projY(pC), cx = laneToX(pC, o.lane);
-    const rx = halfAt(pC) * o.w * 1.2;                    // 도로보다 넓게(길 밖까지)
-    const span = projY(o.p) - projY(Math.max(0.02, o.p - o.len));
-    const ry = Math.max(rx * 0.28, span * 0.55);          // 세로로 큰(가로로 늘린 크레바스)
-    drawIceHole(cx, cy, rx, ry, sc, o.shape);
-    // 안내(비행 필요)
+    const sc = projScale(o.p), y = projY(o.p), cx = laneToX(o.p, o.lane);
+    const rx = halfAt(o.p) * o.w;        // o.w가 커서 도로 밖까지 넓음
+    const ry = rx * 0.16;                // 넓고 납작
+    drawIceHole(cx, y, rx, ry, sc, o.shape);
     ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center"; ctx.fillStyle = "#ffd07a";
     ctx.font = "bold " + (11 * sc + 6) + "px sans-serif";
-    ctx.fillText("🪽 날아서 건너기!", cx, cy - ry - 8 * sc);
+    ctx.fillText("🪽 날아서 건너기!", cx, y - ry - 9 * sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
@@ -1594,7 +1593,7 @@
       { type: "can", el: BUFF_ELEMENTS[2], lane: 0.55, p: 0.30, vp: 0, done: false, wave: 2.0 },
       { type: "opener", lane: 0.05, p: 0.62, vp: 0, done: false, wave: 1.0 },
       { type: "hole", lane: -0.4, p: 0.5, vp: 0, len: 0.03, w: 0.5, shape: makeJagged(), done: false, cleared: false },
-      { type: "hole", lane: 0, p: 0.93, vp: 0, len: 0.28, w: 1.0, shape: makeJagged(), done: false, cleared: false },
+      { type: "hole", lane: 0, p: 0.93, vp: 0, len: 0.15, w: 1.25, shape: makeJagged(), done: false, cleared: false },
     ];
     stored = [{ symbol: "Fe", name: "철", color: "#9aa7b0" }, { symbol: "Cu", name: "구리", color: "#d98f5a" }, { symbol: "Au", name: "금", color: "#e8c349" }];
     scenery = [
