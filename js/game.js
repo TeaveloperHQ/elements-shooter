@@ -1205,106 +1205,60 @@
   }
 
   // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
-  function drawCrevasse(o) {
-    const sc = projScale(o.p), y = projY(o.p);
-    const cx = laneToX(o.p, o.lane);
-    const rx = halfAt(o.p) * o.w, ry = rx * 0.26;
-    const shp = o.shape, n = shp.length;
+  // 들쭉날쭉 얼음 구멍(크레바스/협곡 공용)
+  function drawIceHole(cx, cy, rx, ry, sc, shp) {
+    const n = shp.length;
     function outline() {
       ctx.beginPath();
-      for (let i = 0; i <= n; i++) {
-        const a = (i % n) / n * Math.PI * 2, rr = shp[i % n];
-        const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
+      for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n]; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
       ctx.closePath();
     }
+    const cols = Math.max(4, Math.round(rx / 18));
     ctx.save();
-    const g = ctx.createRadialGradient(cx, y - ry * 0.2, 1, cx, y, rx);
-    g.addColorStop(0, "#0e3550"); g.addColorStop(0.55, "#19567a"); g.addColorStop(1, "#3f86ad");
+    const g = ctx.createRadialGradient(cx, cy - ry * 0.2, 1, cx, cy, Math.max(rx, ry));
+    g.addColorStop(0, "#081f33"); g.addColorStop(0.5, "#143f5e"); g.addColorStop(1, "#3a7ca2");
     ctx.fillStyle = g; outline(); ctx.fill();
-    // 안쪽 깊은 그늘(깊이감)
-    ctx.fillStyle = "rgba(4,18,34,0.5)";
+    // 안쪽 깊은 그늘
+    ctx.fillStyle = "rgba(3,14,28,0.55)";
     ctx.beginPath();
-    for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = y + Math.sin(a) * ry * rr + ry * 0.2; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+    for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr + ry * 0.18; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 세로 빙벽 결(단면 디테일)
-    ctx.strokeStyle = "rgba(150,200,235,0.4)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
-    for (let k = -2; k <= 2; k++) {
-      const px = cx + k * rx * 0.3, len = 0.45 + shp[(k + 5) % n] * 0.35;
-      ctx.beginPath(); ctx.moveTo(px, y - ry * 0.5); ctx.lineTo(px, y + ry * len); ctx.stroke();
-    }
-    // 위 가장자리 고드름(아래로)
+    // 세로 빙벽 결
+    ctx.strokeStyle = "rgba(150,200,235,0.34)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
+    for (let k = 0; k <= cols; k++) { const px = cx + (k / cols - 0.5) * rx * 1.7, len = 0.42 + shp[k % n] * 0.4; ctx.beginPath(); ctx.moveTo(px, cy - ry * 0.5); ctx.lineTo(px, cy + ry * len); ctx.stroke(); }
+    // 위 가장자리 고드름
     ctx.fillStyle = "rgba(228,246,255,0.88)";
-    for (let k = -2; k <= 2; k++) {
-      const px = cx + k * rx * 0.28 + rx * 0.06, ty = y - ry * 0.62, il = (3 + shp[(k + 3) % n] * 4) * sc;
-      ctx.beginPath(); ctx.moveTo(px - 2 * sc, ty); ctx.lineTo(px + 2 * sc, ty); ctx.lineTo(px, ty + il); ctx.closePath(); ctx.fill();
-    }
+    for (let k = 0; k <= cols; k++) { const px = cx + (k / cols - 0.5) * rx * 1.5, ty = cy - ry * 0.6, il = (3 + shp[(k + 3) % n] * 4) * sc; ctx.beginPath(); ctx.moveTo(px - 2 * sc, ty); ctx.lineTo(px + 2 * sc, ty); ctx.lineTo(px, ty + il); ctx.closePath(); ctx.fill(); }
     // 깨진 얼음 테
-    ctx.strokeStyle = "rgba(225,245,255,0.9)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(228,246,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
-    // 가장자리 서리 알갱이
-    ctx.fillStyle = "rgba(236,248,255,0.85)";
-    for (let k = 0; k < 5; k++) { const a = 0.4 + k * 1.3; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, y + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.1 * sc), 0, Math.PI * 2); ctx.fill(); }
+    // 서리 알갱이
+    ctx.fillStyle = "rgba(238,249,255,0.85)";
+    for (let k = 0; k < Math.max(5, cols); k++) { const a = 0.4 + k * 1.27; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, cy + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.2 * sc), 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
+  }
+
+  function drawCrevasse(o) {
+    const sc = projScale(o.p), y = projY(o.p), cx = laneToX(o.p, o.lane);
+    const rx = halfAt(o.p) * o.w, ry = rx * 0.26;
+    drawIceHole(cx, y, rx, ry, sc, o.shape);
     ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
     ctx.font = "bold " + (9 * sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", cx, y - ry - 8 * sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
-  // 거대 협곡 — 길을 가로지르는 들쭉날쭉 띠
+  // 거대 협곡 — 크레바스를 옆으로 늘려 길 밖까지 가로지르는 큰 얼음 구멍
   function drawCanyon(o) {
-    const fP = o.p, bP = Math.max(0.02, o.p - o.len);
-    const fy = projY(fP), by = projY(bP);
-    const fcx = laneToX(fP, o.lane), bcx = laneToX(bP, o.lane);
-    const frx = halfAt(fP) * o.w, brx = halfAt(bP) * o.w;
-    const sc = projScale(fP), shp = o.shape, n = shp.length;
-
-    ctx.save();
-    const dY = fy - by;            // 화면상 높이(앞이 아래)
-    // 들쭉날쭉 협곡 외곽선(사방 모두 불규칙)
-    function canyonPath() {
-      const segN = 7;
-      ctx.beginPath();
-      for (let i = 0; i <= segN; i++) { const t = i / segN, x = (fcx - frx) + 2 * frx * t, j = (shp[i % n] - 0.82) * 11 * sc; if (i === 0) ctx.moveTo(x, fy + j); else ctx.lineTo(x, fy + j); }   // 앞(왼→오)
-      for (let i = 1; i <= segN; i++) { const t = i / segN, x = (fcx + frx) + ((bcx + brx) - (fcx + frx)) * t, y = fy + (by - fy) * t, jx = (shp[(i + 2) % n] - 0.82) * 8 * sc * (1 - t * 0.5); ctx.lineTo(x + jx, y); }   // 오른변
-      for (let i = 1; i <= segN; i++) { const t = i / segN, x = (bcx + brx) - 2 * brx * t, j = (shp[(i + 4) % n] - 0.82) * 6 * sc; ctx.lineTo(x, by + j); }   // 뒤(오→왼)
-      for (let i = 1; i < segN; i++) { const t = i / segN, x = (bcx - brx) + ((fcx - frx) - (bcx - brx)) * t, y = by + (fy - by) * t, jx = (shp[(i + 1) % n] - 0.82) * 8 * sc * (0.5 + t * 0.5); ctx.lineTo(x - jx, y); }   // 왼변
-      ctx.closePath();
-    }
-    // 채움(깊이 그라데이션)
-    const g = ctx.createLinearGradient(0, by, 0, fy);
-    g.addColorStop(0, "#2f6f95"); g.addColorStop(0.4, "#173f5e"); g.addColorStop(1, "#071d30");
-    ctx.fillStyle = g; canyonPath(); ctx.fill();
-    // 안쪽 디테일(클립)
-    ctx.save(); canyonPath(); ctx.clip();
-    // 뒤쪽 더 깊은 그늘
-    const dg = ctx.createLinearGradient(0, by, 0, by + dY * 0.65);
-    dg.addColorStop(0, "rgba(2,12,24,0.72)"); dg.addColorStop(1, "rgba(2,12,24,0)");
-    ctx.fillStyle = dg; ctx.fillRect(0, by - 6, W, dY * 0.75);
-    // 세로 빙벽 결
-    ctx.strokeStyle = "rgba(150,200,235,0.26)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
-    for (let k = 0; k <= 8; k++) { const f = k / 8, tx = bcx + (f - 0.5) * 2 * brx, bxn = fcx + (f - 0.5) * 2 * frx; ctx.beginPath(); ctx.moveTo(tx, by); ctx.lineTo(bxn, fy); ctx.stroke(); }
-    // 가로 얼음 단(레지)
-    ctx.strokeStyle = "rgba(120,165,200,0.28)"; ctx.lineWidth = Math.max(0.8, sc);
-    for (let k = 1; k <= 3; k++) { const t = k / 4, yy = by + dY * t, cxk = bcx + (fcx - bcx) * t, hk = brx + (frx - brx) * t; ctx.beginPath(); ctx.moveTo(cxk - hk * 0.92, yy); ctx.lineTo(cxk + hk * 0.92, yy); ctx.stroke(); }
-    ctx.restore();
-    // 밝은 깨진 얼음 테(전체 둘레)
-    ctx.strokeStyle = "rgba(230,247,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
-    canyonPath(); ctx.stroke();
-    // 뒤 가장자리 고드름(작게, 아래로)
-    ctx.fillStyle = "rgba(225,245,255,0.82)";
-    for (let k = 0; k <= 7; k++) { const t = (k + 0.5) / 8, xx = (bcx - brx) + 2 * brx * t, il = (2.4 + shp[k % n] * 3) * sc; ctx.beginPath(); ctx.moveTo(xx - 1.8 * sc, by); ctx.lineTo(xx + 1.8 * sc, by); ctx.lineTo(xx, by + il); ctx.closePath(); ctx.fill(); }
-    // 앞 가장자리 서리 알갱이
-    ctx.fillStyle = "rgba(240,250,255,0.85)";
-    for (let k = 0; k < 7; k++) { const t = (k + 0.5) / 7, xx = (fcx - frx) + 2 * frx * t; ctx.beginPath(); ctx.arc(xx, fy + (shp[k % n] - 0.82) * 10 * sc, Math.max(1, 1.4 * sc), 0, Math.PI * 2); ctx.fill(); }
-    ctx.restore();
-
-    // 안내(거대 협곡은 비행 필요)
-    ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center";
-    ctx.fillStyle = "#ffd07a";
+    const pC = Math.max(0.05, o.p - o.len / 2);          // 구멍 가운데 깊이
+    const sc = projScale(pC), cy = projY(pC), cx = laneToX(pC, o.lane);
+    const rx = halfAt(pC) * o.w * 1.2;                    // 도로보다 넓게(길 밖까지)
+    const span = projY(o.p) - projY(Math.max(0.02, o.p - o.len));
+    const ry = Math.max(rx * 0.28, span * 0.55);          // 세로로 큰(가로로 늘린 크레바스)
+    drawIceHole(cx, cy, rx, ry, sc, o.shape);
+    // 안내(비행 필요)
+    ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center"; ctx.fillStyle = "#ffd07a";
     ctx.font = "bold " + (11 * sc + 6) + "px sans-serif";
-    ctx.fillText("🪽 날아서 건너기!", fcx, fy - 7 * sc);
+    ctx.fillText("🪽 날아서 건너기!", cx, cy - ry - 8 * sc);
     ctx.textAlign = "start"; ctx.restore();
   }
 
