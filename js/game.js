@@ -288,7 +288,7 @@
     if (Math.random() < 0.26) {
       // 이번 스테이지의 전세계 명물(길 옆에 보이도록)
       const lm = stageLandmark();
-      scenery.push({ type: "landmark", key: lm.key, lane: side * (1.18 + Math.random() * 0.35),
+      scenery.push({ type: "landmark", key: lm.key, icon: lm.icon, lane: side * (1.18 + Math.random() * 0.35),
         p: 0, vp: 0.10, flip: side < 0 });
     } else {
       const types = ["igloo", "mound", "spikes", "penguin", "mound", "spikes", "sign"];
@@ -912,8 +912,8 @@
       const y = projY(d.p);
       if (d.type === "landmark") {
         ctx.fillStyle = "rgba(40,80,120,0.16)";
-        ctx.beginPath(); ctx.ellipse(x, y, 24 * base, 5 * base, 0, 0, Math.PI * 2); ctx.fill();
-        drawLandmark(d.key, x, y, base * 2.7, d.flip);
+        ctx.beginPath(); ctx.ellipse(x, y, 22 * base, 5 * base, 0, 0, Math.PI * 2); ctx.fill();
+        drawLandmarkIcon(d.icon || stageLandmark().icon, d.name || "", x, y, base);
         continue;
       }
       const sc = base * 1.15;
@@ -927,7 +927,30 @@
     }
   }
 
-  // ---------- 전세계 명물 얼음조각 ----------
+  // ---------- 명물: 빙판 받침대 위 아이콘(서리 글로우) ----------
+  function drawLandmarkIcon(icon, name, x, y, base) {
+    const s = base;
+    // 얼음 받침대(원기둥 단)
+    ctx.fillStyle = "rgba(206,228,244,0.95)";
+    ctx.fillRect(x - 14 * s, y - 9 * s, 28 * s, 9 * s);
+    ctx.fillStyle = "rgba(247,252,255,0.97)"; ctx.strokeStyle = "rgba(120,160,195,0.5)"; ctx.lineWidth = Math.max(1, s);
+    ctx.beginPath(); ctx.ellipse(x, y - 9 * s, 14 * s, 4 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(150,190,220,0.4)";
+    ctx.beginPath(); ctx.ellipse(x, y, 14 * s, 4 * s, 0, 0, Math.PI); ctx.fill();
+    // 명물 아이콘(서리 글로우)
+    const fs = 46 * s + 6;
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.font = fs + "px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','EmojiOne Color',sans-serif";
+    ctx.shadowColor = "rgba(190,228,255,0.95)"; ctx.shadowBlur = 9 * s; ctx.shadowOffsetY = -1;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(icon, x, y - 11 * s);
+    ctx.restore();
+    // 살짝 반짝임
+    oSparkle(x + 11 * s, y - fs * 0.7, 2 * s, "rgba(255,255,255,0.85)");
+  }
+
+  // ---------- 전세계 명물 얼음조각(미사용: 아이콘 방식으로 대체) ----------
   function iceGrad(yTop) {
     const g = ctx.createLinearGradient(0, yTop, 0, 0);
     g.addColorStop(0, "#ffffff"); g.addColorStop(0.55, "#dcebf6"); g.addColorStop(1, "#a6c6dd");
@@ -1621,8 +1644,8 @@
     ];
     stored = [{ symbol: "Fe", name: "철", color: "#9aa7b0" }, { symbol: "Cu", name: "구리", color: "#d98f5a" }, { symbol: "Au", name: "금", color: "#e8c349" }];
     scenery = [
-      { type: "landmark", key: stageLandmark().key, lane: -1.3, p: 0.5, vp: 0, flip: false },
-      { type: "landmark", key: stageLandmark().key, lane: 1.32, p: 0.66, vp: 0, flip: true },
+      { type: "landmark", key: stageLandmark().key, icon: stageLandmark().icon, lane: -1.3, p: 0.5, vp: 0, flip: false },
+      { type: "landmark", key: stageLandmark().key, icon: stageLandmark().icon, lane: 1.32, p: 0.66, vp: 0, flip: true },
       { type: "igloo", lane: -1.3, p: 0.34, vp: 0, flip: false },
       { type: "penguin", lane: 1.28, p: 0.4, vp: 0, flip: true },
     ];
