@@ -460,7 +460,7 @@
     player.tumble = 0.6;
     screenFlash = 0.22; shake = Math.min(16, shake + 9);
     spawnParticles(ox, playerLineY(), "#dfe9f2", 12, 180);
-    spawnText(player.x, playerLineY() - 44, "돌부리에 걸려 넘어짐! 💫", "#ffcf9a", 18);
+    spawnText(player.x, playerLineY() - 44, "걸려 넘어짐! 💫", "#ffcf9a", 18);
     SND.bad();
     updateHUD();
   }
@@ -933,6 +933,17 @@
     g.addColorStop(0, "#ffffff"); g.addColorStop(0.55, "#dcebf6"); g.addColorStop(1, "#a6c6dd");
     return g;
   }
+  // 2.5D: 같은 도형을 뒤(우상단)로 압출한 어두운 면 + 앞면 → 입체감
+  const LM_SIDE = "rgba(118,156,193,0.97)", LM_TOP = "rgba(208,230,247,0.97)";
+  function lmSolid(buildPath, front, u) {
+    const dx = 0.8 * u, dy = -0.52 * u;
+    // 측/상단 압출 면(여러 단계로 깊이감)
+    ctx.fillStyle = LM_SIDE;
+    for (let s = 1; s <= 5; s++) { const t = s / 5; ctx.save(); ctx.translate(dx * t, dy * t); buildPath(); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = LM_TOP; ctx.save(); ctx.translate(dx, dy); buildPath(); ctx.fill(); ctx.restore();
+    // 앞면
+    ctx.fillStyle = front; buildPath(); ctx.fill(); ctx.stroke();
+  }
   function drawLandmark(key, x, y, s, flip) {
     const u = 8 * s;
     ctx.save();
@@ -1007,10 +1018,10 @@
     ctx.beginPath(); ctx.moveTo(2.4 * u, 0); ctx.lineTo(3.6 * u, -3 * u); ctx.lineTo(4.8 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   function lmLiberty(u) {
+    lmSolid(function () { ctx.beginPath(); ctx.rect(-1.6 * u, -2 * u, 3.2 * u, 2 * u); }, iceGrad(-u * 3), u);   // 받침
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.3 * u, -2 * u); ctx.lineTo(-0.6 * u, -5.4 * u); ctx.lineTo(0.6 * u, -5.4 * u); ctx.lineTo(1.3 * u, -2 * u); ctx.closePath(); }, iceGrad(-u * 5), u);   // 로브
+    lmSolid(function () { ctx.beginPath(); ctx.arc(0, -6 * u, 0.62 * u, 0, Math.PI * 2); }, iceGrad(-u * 6.6), u);   // 머리
     ctx.fillStyle = iceGrad(-u * 7.5);
-    ctx.fillRect(-1.6 * u, -2 * u, 3.2 * u, 2 * u); ctx.strokeRect(-1.6 * u, -2 * u, 3.2 * u, 2 * u);   // 받침
-    ctx.beginPath(); ctx.moveTo(-1.3 * u, -2 * u); ctx.lineTo(-0.6 * u, -5.4 * u); ctx.lineTo(0.6 * u, -5.4 * u); ctx.lineTo(1.3 * u, -2 * u); ctx.closePath(); ctx.fill(); ctx.stroke();  // 로브
-    ctx.beginPath(); ctx.arc(0, -6 * u, 0.62 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();  // 머리
     // 왕관 가시
     ctx.fillStyle = iceGrad(-u * 7.5);
     for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(k * 0.28 * u - 0.1 * u, -6.5 * u); ctx.lineTo(k * 0.28 * u, -7.2 * u); ctx.lineTo(k * 0.28 * u + 0.1 * u, -6.5 * u); ctx.closePath(); ctx.fill(); }
@@ -1022,18 +1033,15 @@
   }
   function lmPisa(u) {
     ctx.save(); ctx.rotate(-0.13);
-    ctx.fillStyle = iceGrad(-u * 6);
-    ctx.fillRect(-1.1 * u, -6 * u, 2.2 * u, 6 * u); ctx.strokeRect(-1.1 * u, -6 * u, 2.2 * u, 6 * u);
+    lmSolid(function () { ctx.beginPath(); ctx.rect(-1.1 * u, -6 * u, 2.2 * u, 6 * u); }, iceGrad(-u * 6), u);
     ctx.strokeStyle = "rgba(120,160,195,0.4)";
     for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(-1.1 * u, -k * u); ctx.lineTo(1.1 * u, -k * u); ctx.stroke(); }
-    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(-1.0 * u, -6.6 * u, 2.0 * u, 0.6 * u);
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(-1.0 * u, -6.6 * u, 2.0 * u, 0.6 * u);
     ctx.restore();
   }
   function lmWindmill(u) {
-    ctx.fillStyle = iceGrad(-u * 5);
-    ctx.beginPath(); ctx.moveTo(-1.7 * u, 0); ctx.lineTo(-1.1 * u, -5 * u); ctx.lineTo(1.1 * u, -5 * u); ctx.lineTo(1.7 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = iceGrad(-u * 6.2);
-    ctx.beginPath(); ctx.moveTo(-1.2 * u, -5 * u); ctx.lineTo(0, -6.2 * u); ctx.lineTo(1.2 * u, -5 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.7 * u, 0); ctx.lineTo(-1.1 * u, -5 * u); ctx.lineTo(1.1 * u, -5 * u); ctx.lineTo(1.7 * u, 0); ctx.closePath(); }, iceGrad(-u * 5), u);
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.2 * u, -5 * u); ctx.lineTo(0, -6.2 * u); ctx.lineTo(1.2 * u, -5 * u); ctx.closePath(); }, iceGrad(-u * 6.2), u);
     // 날개(회전)
     ctx.save(); ctx.translate(0, -5 * u); ctx.rotate(elapsed * 1.2);
     ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.strokeStyle = "rgba(120,160,195,0.6)";
@@ -1042,10 +1050,7 @@
     ctx.fillStyle = "#7fa8c4"; ctx.beginPath(); ctx.arc(0, -5 * u, 0.4 * u, 0, Math.PI * 2); ctx.fill();
   }
   function lmMoai(u) {
-    ctx.fillStyle = iceGrad(-u * 6);
-    ctx.beginPath();
-    ctx.moveTo(-1.5 * u, 0); ctx.lineTo(-1.7 * u, -3.5 * u); ctx.quadraticCurveTo(-1.7 * u, -6 * u, 0, -6 * u);
-    ctx.quadraticCurveTo(1.7 * u, -6 * u, 1.7 * u, -3.5 * u); ctx.lineTo(1.5 * u, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.5 * u, 0); ctx.lineTo(-1.7 * u, -3.5 * u); ctx.quadraticCurveTo(-1.7 * u, -6 * u, 0, -6 * u); ctx.quadraticCurveTo(1.7 * u, -6 * u, 1.7 * u, -3.5 * u); ctx.lineTo(1.5 * u, 0); ctx.closePath(); }, iceGrad(-u * 6), u);
     // 눈썹/코
     ctx.fillStyle = "rgba(80,120,160,0.35)";
     ctx.fillRect(-1.2 * u, -4.4 * u, 2.4 * u, 0.5 * u);
@@ -1053,27 +1058,23 @@
     ctx.fillRect(-0.9 * u, -1.5 * u, 1.8 * u, 0.4 * u);
   }
   function lmClock(u) {
-    ctx.fillStyle = iceGrad(-u * 6.5);
-    ctx.fillRect(-1.3 * u, -6.5 * u, 2.6 * u, 6.5 * u); ctx.strokeRect(-1.3 * u, -6.5 * u, 2.6 * u, 6.5 * u);
-    ctx.fillStyle = iceGrad(-u * 8);
-    ctx.beginPath(); ctx.moveTo(-1.3 * u, -6.5 * u); ctx.lineTo(0, -8 * u); ctx.lineTo(1.3 * u, -6.5 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // 시계
+    lmSolid(function () { ctx.beginPath(); ctx.rect(-1.3 * u, -6.5 * u, 2.6 * u, 6.5 * u); }, iceGrad(-u * 6.5), u);
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.3 * u, -6.5 * u); ctx.lineTo(0, -8 * u); ctx.lineTo(1.3 * u, -6.5 * u); ctx.closePath(); }, iceGrad(-u * 8), u);
+    // 시계(앞면)
     ctx.fillStyle = "#eef6ff"; ctx.beginPath(); ctx.arc(0, -5.2 * u, 0.95 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = "#5f7e98"; ctx.lineWidth = Math.max(1, u * 0.16); ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0, -5.9 * u); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0.5 * u, -5 * u); ctx.stroke();
     ctx.strokeStyle = "rgba(120,160,195,0.6)"; ctx.lineWidth = Math.max(1, u * 0.12);
   }
   function lmTaj(u) {
-    ctx.fillStyle = iceGrad(-u * 6);
-    ctx.fillRect(-2.2 * u, -2.2 * u, 4.4 * u, 2.2 * u); ctx.strokeRect(-2.2 * u, -2.2 * u, 4.4 * u, 2.2 * u);   // 기단
-    // 중앙 양파돔
-    ctx.beginPath();
-    ctx.moveTo(-1.3 * u, -2.2 * u); ctx.quadraticCurveTo(-1.6 * u, -4.4 * u, 0, -5.2 * u);
-    ctx.quadraticCurveTo(1.6 * u, -4.4 * u, 1.3 * u, -2.2 * u); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#dcebf6"; ctx.beginPath(); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0, -6 * u); ctx.stroke();
-    // 미나렛 4개
-    ctx.fillStyle = iceGrad(-u * 5);
-    for (const mx of [-2.6, -2.0, 2.0, 2.6]) { ctx.fillRect(mx * u - 0.2 * u, -5 * u, 0.4 * u, 5 * u); ctx.strokeRect(mx * u - 0.2 * u, -5 * u, 0.4 * u, 5 * u); }
+    // 미나렛 4개(가는 기둥)
+    for (const mx of [-2.6, -2.0, 2.0, 2.6]) lmSolid(function () { ctx.beginPath(); ctx.rect(mx * u - 0.2 * u, -5 * u, 0.4 * u, 5 * u); }, iceGrad(-u * 5), u);
+    // 기단
+    lmSolid(function () { ctx.beginPath(); ctx.rect(-2.2 * u, -2.2 * u, 4.4 * u, 2.2 * u); }, iceGrad(-u * 4), u);
+    // 중앙 양파돔(압출)
+    lmSolid(function () { ctx.beginPath(); ctx.moveTo(-1.3 * u, -2.2 * u); ctx.quadraticCurveTo(-1.6 * u, -4.4 * u, 0, -5.2 * u); ctx.quadraticCurveTo(1.6 * u, -4.4 * u, 1.3 * u, -2.2 * u); ctx.closePath(); }, iceGrad(-u * 5.2), u);
+    ctx.strokeStyle = "rgba(120,160,195,0.6)"; ctx.lineWidth = Math.max(1, u * 0.12);
+    ctx.beginPath(); ctx.moveTo(0, -5.2 * u); ctx.lineTo(0, -6 * u); ctx.stroke();
   }
   function lmIceberg(u) {
     // 각진 빙산
@@ -1093,6 +1094,9 @@
     ctx.beginPath(); ctx.moveTo(-3 * u, 0.3 * u); ctx.lineTo(3 * u, 0.3 * u); ctx.stroke();
   }
   function lmNorthpole(u) {
+    // 측면 압출(입체)
+    ctx.fillStyle = LM_SIDE;
+    for (let s = 1; s <= 5; s++) { const t = s / 5; ctx.save(); ctx.translate(0.8 * u * t, -0.52 * u * t); ctx.beginPath(); ctx.rect(-0.6 * u, -6 * u, 1.2 * u, 6 * u); ctx.fill(); ctx.restore(); }
     // 빨강/흰 줄무늬 기둥
     for (let k = 0; k < 6; k++) {
       ctx.fillStyle = (k % 2) ? "#e23b3b" : "#ffffff";
@@ -1488,8 +1492,12 @@
     const fl = (fly || air) ? -1 : stepL, fr = (fly || air) ? -1 : stepR;
     ctx.beginPath(); ctx.ellipse(-4, 5 - fl, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(4, 5 - fr, 3.8, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // 꼬리
-    ctx.fillStyle = "#11202b"; ctx.beginPath(); ctx.moveTo(-3, 3); ctx.lineTo(3, 3); ctx.lineTo(0, 9); ctx.closePath(); ctx.fill();
+    // 꽁지깃(3갈래)
+    ctx.fillStyle = "#0c1620";
+    ctx.beginPath();
+    ctx.moveTo(-4, 2); ctx.lineTo(-1.3, 10.5); ctx.lineTo(-0.3, 3);
+    ctx.lineTo(0.3, 3); ctx.lineTo(1.3, 10.5); ctx.lineTo(4, 2);
+    ctx.closePath(); ctx.fill();
     // 몸통(등) + 테두리
     const bg = ctx.createLinearGradient(-8, -23, 8, 5);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
@@ -1499,6 +1507,12 @@
     ctx.fillStyle = "rgba(244,251,255,0.9)";
     ctx.beginPath(); ctx.ellipse(-7.8, -6, 2.5, 8, 0.12, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(7.8, -6, 2.5, 8, -0.12, 0, Math.PI * 2); ctx.fill();
+    // 등 깃 결(미세 세로 줄)
+    ctx.strokeStyle = "rgba(90,120,150,0.22)"; ctx.lineWidth = 0.6;
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 3.2, -18); ctx.lineTo(k * 3.0, -1); ctx.stroke(); }
+    // 등 가운데 솔기(척추)
+    ctx.strokeStyle = "rgba(8,14,20,0.5)"; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 1); ctx.stroke();
     // 등 림라이트(좌상단 빛)
     ctx.fillStyle = "rgba(150,185,215,0.28)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7, -0.25, 0, Math.PI * 2); ctx.fill();
     // 날개(날 땐 크게 펄럭)
