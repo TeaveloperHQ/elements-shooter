@@ -606,7 +606,7 @@
         const w = (layer ? 55 : 38) + Math.random() * (layer ? 85 : 55);
         const h = (layer ? 34 : 20) + Math.random() * (layer ? 58 : 36);
         bergs.push({ x: x, w: w, h: h, layer: layer,
-          peak: 0.28 + Math.random() * 0.44, cap: Math.random() < 0.7 });
+          peak: 0.42 + Math.random() * 0.16, cap: Math.random() < 0.78 });
         x += w * (0.55 + Math.random() * 0.4);
       }
     }
@@ -760,22 +760,33 @@
     sg.addColorStop(0, "rgba(255,255,255,0.95)"); sg.addColorStop(0.4, "rgba(200,235,255,0.5)"); sg.addColorStop(1, "rgba(200,235,255,0)");
     ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.74, hy * 0.6, 60, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 
-    // 빙산 — 2겹(뒤→앞), 좌면 밝음/우면 그늘 + 눈모자로 입체감
+    // 설산 — 2겹(뒤→앞), 좌면 밝음/우면 그늘 + 꼭대기 눈모자
     for (const b of bergs) {
       const px = b.x + b.w * b.peak, top = hy - b.h;
+      const lx = b.x, rx2 = b.x + b.w;
       const lit = b.layer ? "rgba(150,190,222,0.92)" : "rgba(206,230,247,0.96)";
       const shade = b.layer ? "rgba(116,160,198,0.92)" : "rgba(168,204,232,0.96)";
-      ctx.fillStyle = lit;   // 왼면
-      ctx.beginPath(); ctx.moveTo(b.x, hy); ctx.lineTo(px, top); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = shade; // 오른면(그늘)
-      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(b.x + b.w, hy); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
-      if (b.cap) {           // 눈 모자
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
+      // 왼면(밝음) / 오른면(그늘)
+      ctx.fillStyle = lit;
+      ctx.beginPath(); ctx.moveTo(lx, hy); ctx.lineTo(px, top); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = shade;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(rx2, hy); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      // 능선 하이라이트
+      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, hy); ctx.stroke();
+      // 꼭대기 눈모자 — 봉우리 경사를 따라, 아래는 물결 설선
+      if (b.cap) {
+        const f = 0.34;                              // 눈선 높이(꼭대기에서 비율)
+        const yS = top + b.h * f;
+        const xl = px + (lx - px) * f, xr = px + (rx2 - px) * f;
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
         ctx.beginPath();
         ctx.moveTo(px, top);
-        ctx.lineTo(px - b.w * 0.13, top + b.h * 0.26);
-        ctx.lineTo(px - b.w * 0.02, top + b.h * 0.20);
-        ctx.lineTo(px + b.w * 0.11, top + b.h * 0.30);
+        ctx.lineTo(xr, yS);
+        ctx.lineTo(px + (xr - px) * 0.45, yS - b.h * 0.05);
+        ctx.lineTo(px - (px - xl) * 0.2, yS + b.h * 0.04);
+        ctx.lineTo(px - (px - xl) * 0.6, yS - b.h * 0.02);
+        ctx.lineTo(xl, yS);
         ctx.closePath(); ctx.fill();
       }
     }
@@ -1483,17 +1494,17 @@
     const bg = ctx.createLinearGradient(-8, -23, 8, 5);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.ellipse(0, -9, 11, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -8, 12.5, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 통통한 몸
     // 흰 배 가장자리(양옆 살짝 보임) — 검은 덩어리 느낌 완화
     ctx.fillStyle = "rgba(244,251,255,0.9)";
-    ctx.beginPath(); ctx.ellipse(-6.5, -7, 2.2, 8.5, 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(6.5, -7, 2.2, 8.5, -0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-7.8, -6, 2.5, 8, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(7.8, -6, 2.5, 8, -0.12, 0, Math.PI * 2); ctx.fill();
     // 등 림라이트(좌상단 빛)
-    ctx.fillStyle = "rgba(150,185,215,0.28)"; ctx.beginPath(); ctx.ellipse(-3, -13, 3.5, 7, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(150,185,215,0.28)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7, -0.25, 0, Math.PI * 2); ctx.fill();
     // 날개(날 땐 크게 펄럭)
     ctx.fillStyle = "#0e1a24";
-    ctx.save(); ctx.translate(-9, -10); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.4, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(9, -10); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.4, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(-10.5, -9); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.5, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(10.5, -9); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.5, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     // 날 때 반짝이는 활공 효과
     if (fly) {
       ctx.fillStyle = "rgba(180,235,255,0.5)";
@@ -1501,14 +1512,14 @@
     }
     // 빨간 목도리 + 매듭 + 펄럭이는 자락
     ctx.fillStyle = "#e23b3b"; ctx.strokeStyle = "#a82626"; ctx.lineWidth = 0.7;
-    ctx.beginPath(); ctx.ellipse(0, -15, 8.5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -15, 9.2, 2.7, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#c92f2f"; ctx.beginPath();
-    ctx.moveTo(5.5, -14); ctx.lineTo(11 + flap * 4, -9 + flap * 7); ctx.lineTo(7.5, -12.5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.6, 0, Math.PI * 2); ctx.fill();
-    // 뒤통수 + 하이라이트
+    ctx.moveTo(6, -14); ctx.lineTo(11.5 + flap * 4, -9 + flap * 7); ctx.lineTo(8, -12.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.7, 0, Math.PI * 2); ctx.fill();
+    // 뒤통수(둥글게) + 하이라이트
     ctx.fillStyle = "#1b2733"; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.arc(0, -22, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.5, -24, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -20.5, 8.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22.5, 3.2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
