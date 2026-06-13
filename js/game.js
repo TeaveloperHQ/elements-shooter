@@ -290,8 +290,8 @@
   }
   function spawnObstacle() {
     let r = Math.random();
-    // 거대 협곡이 떠 있는 동안엔 보통 크레바스를 겹쳐 내보내지 않음
-    if (r < 0.35 && items.some(function (o) { return o.canyon; })) r = 0.6;
+    // 겹침 방지: 협곡이 떠 있거나, 다른 구덩이가 아직 가까이(p<0.28) 있으면 크레바스 대신 통조림
+    if (r < 0.35 && items.some(function (o) { return o.canyon || (o.type === "hole" && o.p < 0.28); })) r = 0.6;
     if (r < 0.35) {
       // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능 (큰 협곡은 스테이지 끝에만)
       const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
@@ -311,6 +311,8 @@
 
   // 거대 협곡(스테이지 끝) — 길을 가로지름. 점프로는 못 넘고 에너지 모아 비행으로 건너야 함
   function spawnCanyon() {
+    // 접근 중인 보통 크레바스 제거(길 전체를 가로지르는 협곡과 겹치지 않게)
+    items = items.filter(function (o) { return !(o.type === "hole" && !o.canyon && o.p < 0.92); });
     items.push({ type: "hole", canyon: true, lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
       w: 1.3, len: 0.08, shape: makeJagged() });
     showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
@@ -1261,33 +1263,44 @@
       for (let i = 0; i < 4; i++) ctx.fillText(ml[i], ltx, hy - lth + 30 + i * 27);
       ctx.textAlign = "start"; ctx.restore();
     }
-    // 경복궁 누각
-    const cx = W * 0.42, base = hy, bw = 124;
-    // 곡선 기와지붕(위로 들린 처마)
+    // 경복궁 광화문 — 넓고 낮은 한식 지붕(완만한 처마) + 단청(녹·적) 2층
+    const cx = W * 0.42, base = hy, bw = 134;
+    // 한식 기와지붕: 넓고 낮으며 처마 끝만 살짝 들림 + 용마루·치미 + 단청 처마밑
     function roof(yEave, w, h) {
-      ctx.fillStyle = "rgba(58,72,92,0.96)";
+      ctx.fillStyle = "rgba(74,84,102,0.96)";
       ctx.beginPath();
-      ctx.moveTo(cx - w / 2, yEave - h * 0.16);
-      ctx.quadraticCurveTo(cx - w * 0.34, yEave - h, cx, yEave - h);
-      ctx.quadraticCurveTo(cx + w * 0.34, yEave - h, cx + w / 2, yEave - h * 0.16);
-      ctx.quadraticCurveTo(cx, yEave + h * 0.14, cx - w / 2, yEave - h * 0.16);
+      ctx.moveTo(cx - w / 2, yEave - h * 0.04);
+      ctx.lineTo(cx - w * 0.22, yEave - h);                       // 완만한 경사
+      ctx.lineTo(cx + w * 0.22, yEave - h);                       // 넓은 수평 용마루
+      ctx.lineTo(cx + w / 2, yEave - h * 0.04);
+      ctx.quadraticCurveTo(cx + w * 0.40, yEave + h * 0.12, cx + w * 0.47, yEave - h * 0.02);  // 처마끝 살짝 들림
+      ctx.lineTo(cx - w * 0.47, yEave - h * 0.02);
+      ctx.quadraticCurveTo(cx - w * 0.40, yEave + h * 0.12, cx - w / 2, yEave - h * 0.04);
       ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(186,206,228,0.4)"; ctx.lineWidth = 1;   // 용마루
-      ctx.beginPath(); ctx.moveTo(cx - w * 0.32, yEave - h * 0.84); ctx.lineTo(cx + w * 0.32, yEave - h * 0.84); ctx.stroke();
+      ctx.fillStyle = "rgba(52,60,76,0.96)"; ctx.fillRect(cx - w * 0.23, yEave - h - 2, w * 0.46, 4);   // 용마루
+      ctx.beginPath(); ctx.moveTo(cx - w * 0.27, yEave - h - 1); ctx.lineTo(cx - w * 0.30, yEave - h - 8); ctx.lineTo(cx - w * 0.21, yEave - h - 1); ctx.closePath(); ctx.fill();  // 좌 치미
+      ctx.beginPath(); ctx.moveTo(cx + w * 0.27, yEave - h - 1); ctx.lineTo(cx + w * 0.30, yEave - h - 8); ctx.lineTo(cx + w * 0.21, yEave - h - 1); ctx.closePath(); ctx.fill();  // 우 치미
+      ctx.fillStyle = "rgba(66,128,116,0.95)"; ctx.fillRect(cx - w * 0.45, yEave - h * 0.02, w * 0.9, 3);  // 단청 처마밑(녹)
+      ctx.fillStyle = "rgba(184,78,66,0.9)"; for (let i = 0; i < 9; i++) { const x = cx - w * 0.42 + i * (w * 0.84 / 8); ctx.fillRect(x - 1, yEave - h * 0.02, 2, 3); }  // 붉은 점
+    }
+    // 단청 몸체(녹청 바탕 + 위 붉은 띠 + 붉은 기둥)
+    function dancheong(yTop, w, hh) {
+      ctx.fillStyle = "rgba(64,128,116,0.95)"; ctx.fillRect(cx - w / 2, yTop, w, hh);
+      ctx.fillStyle = "rgba(170,72,64,0.95)"; ctx.fillRect(cx - w / 2, yTop, w, hh * 0.34);
+      ctx.fillStyle = "rgba(225,215,195,0.8)"; ctx.fillRect(cx - w / 2, yTop + hh * 0.34, w, 1.4);
+      ctx.fillStyle = "rgba(150,68,58,0.95)"; const n = Math.max(4, Math.round(w / 18));
+      for (let i = 0; i <= n; i++) { const x = cx - w / 2 + w * i / n; ctx.fillRect(x - 1.6, yTop + hh * 0.36, 3.2, hh * 0.64); }
     }
     // 석축(돌담) + 홍예문 3
-    ctx.fillStyle = "rgba(182,178,170,0.95)"; ctx.fillRect(cx - bw / 2, base - 30, bw, 30);
-    ctx.fillStyle = "rgba(150,146,140,0.95)"; ctx.fillRect(cx + bw * 0.16, base - 30, bw * 0.34, 30);
-    ctx.fillStyle = "rgba(40,46,54,0.6)";
+    ctx.fillStyle = "rgba(186,182,174,0.96)"; ctx.fillRect(cx - bw / 2, base - 30, bw, 30);
+    ctx.fillStyle = "rgba(158,154,148,0.96)"; ctx.fillRect(cx + bw * 0.16, base - 30, bw * 0.34, 30);
+    ctx.fillStyle = "rgba(36,42,50,0.62)";
     for (const ax of [cx - bw * 0.28, cx, cx + bw * 0.28]) { ctx.beginPath(); ctx.moveTo(ax - 9, base); ctx.lineTo(ax - 9, base - 15); ctx.arc(ax, base - 15, 9, Math.PI, 0); ctx.lineTo(ax + 9, base); ctx.closePath(); ctx.fill(); }
-    // 누각 단청 몸체 + 기둥
-    const pw = bw * 0.84, py = base - 30, ph = 22;
-    ctx.fillStyle = "rgba(150,80,72,0.95)"; ctx.fillRect(cx - pw / 2, py - ph, pw, ph);
-    ctx.fillStyle = "rgba(70,132,120,0.9)"; ctx.fillRect(cx - pw / 2, py - ph, pw, 4);
-    ctx.fillStyle = "rgba(108,54,50,0.95)"; for (let i = 0; i < 6; i++) { const x = cx - pw / 2 + pw * 0.08 + i * pw * 0.168; ctx.fillRect(x - 2, py - ph + 4, 4, ph - 4); }
-    // 2단 곡선 지붕
-    roof(py - ph, bw * 1.08, 26);
-    roof(py - ph - 21, bw * 0.74, 20);
+    // 1층 단청 + 넓은 낮은 지붕 / 2층(작게)
+    dancheong(base - 49, bw * 0.84, 19);
+    roof(base - 49, bw * 1.16, 15);
+    dancheong(base - 77, bw * 0.5, 13);
+    roof(base - 77, bw * 0.74, 13);
   }
 
   function drawBackground() {
