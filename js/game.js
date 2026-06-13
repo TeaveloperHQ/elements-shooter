@@ -268,8 +268,8 @@
   // 협곡 단면의 '랜덤 그물(균열망)' — 생성 시 한 번만 결정, 이후엔 원근으로 크기만 변함
   // 정규화 좌표: x −1~1, y 0(위)~1(아래). 지터된 격자 노드 + 고정 대각 균열.
   function makeStrata() {
-    const cols = 4 + ((Math.random() * 3) | 0);        // 가로 칸 4~6
-    const rows = 3 + ((Math.random() * 2) | 0);        // 세로 칸 3~4
+    const cols = 7 + ((Math.random() * 4) | 0);        // 가로 칸 많게=가로로 좁은 셀(7~10)
+    const rows = 2 + ((Math.random() * 2) | 0);        // 세로 칸 적게=세로로 긴 셀(2~3)
     const nodes = [];
     for (let r = 0; r <= rows; r++) {
       const row = [];
@@ -1495,20 +1495,24 @@
     if (strata && strata.nodes) {
       ctx.save();
       outline(); ctx.clip();
-      const topY = cy - ry * 0.85, botY = cy + ry * 0.62, wallH = botY - topY;
-      const taper = 0.52;                                    // 바닥 폭 = 위 폭의 (1−taper)
+      const topY = cy - ry * 0.9, botY = cy + ry * 0.78, wallH = botY - topY;
+      const taper = 0.55;                                    // 바닥 폭 = 위 폭의 (1−taper) → 아래로 수렴
       const nd = strata.nodes, rows = strata.rows, cols = strata.cols, jit = strata.jit;
-      const SX = function (nx, ny) { return cx + nx * rx * (1 - ny * taper); };   // 아래로 수렴
+      const SX = function (nx, ny) { return cx + nx * rx * (1 - ny * taper); };
       const SY = function (ny) { return topY + ny * wallH; };
-      const TOP = [148, 190, 222], BOT = [11, 30, 51];        // 위:얼음 빛 / 아래:심연
+      const DARK = [9, 26, 46], LIGHT = [118, 160, 194];      // 심부:어둠 / 립(가장자리):얼음 빛
       const cl = function (v) { return v < 0 ? 0 : v > 255 ? 255 : v | 0; };
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const a = nd[r][c], b = nd[r][c + 1], d = nd[r + 1][c + 1], e = nd[r + 1][c];
-        const depth = Math.min(1, (a.y + b.y + d.y + e.y) / 4 * 1.12);
-        const tone = (((r + c) & 1) ? 12 : -12) + jit[r][c];  // 체커 + 고정 지터 → 면마다 색차
-        const R = cl(TOP[0] + (BOT[0] - TOP[0]) * depth + tone);
-        const G = cl(TOP[1] + (BOT[1] - TOP[1]) * depth + tone);
-        const B = cl(TOP[2] + (BOT[2] - TOP[2]) * depth + tone);
+        const mx = (a.x + b.x + d.x + e.x) / 4;               // -1(좌)~1(우)
+        const my = (a.y + b.y + d.y + e.y) / 4;               // 0(위 립)~1(바닥 심연)
+        // 오목 음영: 가장자리(|mx|↑)·위쪽 립은 밝고, 중앙·아래로 갈수록 어둡다
+        let t = (Math.abs(mx) * 0.62 + 0.1) * (1 - my * 0.85);
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const tone = (((r + c) & 1) ? 7 : -7) + jit[r][c];    // 면마다 미세 색차(경계)
+        const R = cl(DARK[0] + (LIGHT[0] - DARK[0]) * t + tone);
+        const G = cl(DARK[1] + (LIGHT[1] - DARK[1]) * t + tone);
+        const B = cl(DARK[2] + (LIGHT[2] - DARK[2]) * t + tone);
         ctx.fillStyle = ctx.strokeStyle = "rgb(" + R + "," + G + "," + B + ")";
         ctx.lineWidth = 0.8;                                  // 같은 색 얇은 테두리로 면 사이 빈틈 메움
         ctx.beginPath();
