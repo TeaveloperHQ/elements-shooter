@@ -265,20 +265,26 @@
     for (let i = 0; i < n; i++) arr.push(0.58 + Math.random() * 0.55);
     return arr;
   }
-  // 협곡 '깎아지른 단면'(절벽 면) — 생성 시 한 번만 결정, 이후엔 원근으로 크기만 변함
-  // 좌표는 정규화(-1~1, 위에서 아래로 0~1). 기둥 개수/폭/높이/명암이 고정된다.
+  // 협곡 단면의 '랜덤 그물(균열망)' — 생성 시 한 번만 결정, 이후엔 원근으로 크기만 변함
+  // 정규화 좌표: x −1~1, y 0(위)~1(아래). 지터된 격자 노드 + 고정 대각 균열.
   function makeStrata() {
-    const n = 7 + ((Math.random() * 4) | 0);          // 기둥 수 고정(7~10)
-    const cols = []; const ws = []; let sum = 0;
-    for (let i = 0; i < n; i++) { const w = 0.6 + Math.random() * 0.8; ws.push(w); sum += w; }
-    let x = -1;
-    for (let i = 0; i < n; i++) {
-      const w = ws[i] / sum * 2;                       // 폭 합이 2(=−1~1)
-      cols.push({ x: x, w: w, top: Math.random() * 0.5, tone: i % 2 });   // top: 부러진 윗면 깊이
-      x += w;
+    const cols = 4 + ((Math.random() * 3) | 0);        // 가로 칸 4~6
+    const rows = 3 + ((Math.random() * 2) | 0);        // 세로 칸 3~4
+    const nodes = [];
+    for (let r = 0; r <= rows; r++) {
+      const row = [];
+      for (let c = 0; c <= cols; c++) {
+        const edge = (c === 0 || c === cols);          // 좌우 끝은 흔들지 않음(테두리 정렬)
+        const jx = edge ? 0 : (Math.random() - 0.5) * (2 / cols) * 0.6;
+        const jy = (r === 0 || r === rows) ? 0 : (Math.random() - 0.5) * (1 / rows) * 0.7;
+        row.push({ x: -1 + (c / cols) * 2 + jx, y: r / rows + jy });
+      }
+      nodes.push(row);
     }
-    const joints = [0.34 + Math.random() * 0.1, 0.66 + Math.random() * 0.1];   // 가로 절리 위치(고정)
-    return { cols: cols, joints: joints };
+    const diags = [];                                  // 고정 대각 균열 몇 가닥(그물 불규칙하게)
+    const dn = 2 + ((Math.random() * 3) | 0);
+    for (let i = 0; i < dn; i++) diags.push([(Math.random() * rows) | 0, (Math.random() * cols) | 0, Math.random() < 0.5 ? 1 : -1]);
+    return { nodes: nodes, rows: rows, cols: cols, diags: diags };
   }
   function spawnObstacle() {
     let r = Math.random();
@@ -1485,31 +1491,34 @@
     ctx.beginPath();
     for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr + ry * 0.18; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 깎아지른 협곡 단면(절벽 면) — 생성 시 고정된 패턴(strata)을 원근 크기에만 맞춰 확대
-    if (strata) {
+    // 협곡 단면의 랜덤 그물(균열망) — 고정 패턴을 원근 크기에만 맞춰 확대
+    if (strata && strata.nodes) {
       ctx.save();
       outline(); ctx.clip();                                 // 구멍 안쪽으로만
-      const topY = cy - ry * 0.92, botY = cy + ry * 0.5;
-      const wallH = botY - topY;
-      for (let k = 0; k < strata.cols.length; k++) {
-        const c = strata.cols[k];
-        const x0 = cx + c.x * rx, cw = c.w * rx;
-        const ty = topY + c.top * ry * 0.5;                  // 고정된 부러진 윗면
-        const cg = ctx.createLinearGradient(0, ty, 0, botY);
-        cg.addColorStop(0, "rgba(150,196,228," + (c.tone ? 0.30 : 0.42) + ")");
-        cg.addColorStop(0.55, "rgba(60,110,150,0.18)");
-        cg.addColorStop(1, "rgba(10,32,54,0)");
-        ctx.fillStyle = cg; ctx.fillRect(x0, ty, cw + 0.8, botY - ty);
-        ctx.fillStyle = "rgba(206,232,250,0.34)"; ctx.fillRect(x0, ty, Math.max(0.8, cw * 0.16), botY - ty);              // 밝은 모서리
-        ctx.fillStyle = "rgba(5,20,38,0.55)"; ctx.fillRect(x0 + cw - Math.max(0.8, cw * 0.13), ty, Math.max(0.8, cw * 0.13), botY - ty);  // 깊은 이음새
-        ctx.fillStyle = "rgba(228,246,255,0.7)"; ctx.fillRect(x0 + cw * 0.16, ty, cw * 0.7, Math.max(0.8, sc));          // 기둥 끝
+      const topY = cy - ry * 0.85, botY = cy + ry * 0.6, wallH = botY - topY;
+      const nd = strata.nodes, rows = strata.rows, cols = strata.cols;
+      const X = function (x) { return cx + x * rx * 0.98; };
+      const Y = function (y) { return topY + y * wallH; };
+      // 그물 균열 경로(가로·세로 + 고정 대각)
+      function netPath() {
+        ctx.beginPath();
+        for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
+          const a = nd[r][c];
+          if (c < cols) { const b = nd[r][c + 1]; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
+          if (r < rows) { const b = nd[r + 1][c]; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
+        }
+        for (let i = 0; i < strata.diags.length; i++) {
+          const d = strata.diags[i], r = d[0], c = d[1], dir = d[2];
+          const cc = dir > 0 ? c : c + 1, a = nd[r][cc], b = nd[r + 1][dir > 0 ? c + 1 : c];
+          ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y));
+        }
       }
-      // 가로 절리(고정 위치)
-      ctx.strokeStyle = "rgba(8,26,46,0.30)"; ctx.lineWidth = Math.max(0.8, sc * 0.8);
-      for (let h = 0; h < strata.joints.length; h++) {
-        const jy = topY + wallH * strata.joints[h];
-        ctx.beginPath(); ctx.moveTo(cx - rx, jy); ctx.lineTo(cx + rx, jy); ctx.stroke();
-      }
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      netPath(); ctx.strokeStyle = "rgba(6,20,38,0.5)"; ctx.lineWidth = Math.max(1.4, sc * 1.6); ctx.stroke();   // 깊은 골
+      netPath(); ctx.strokeStyle = "rgba(190,222,246,0.32)"; ctx.lineWidth = Math.max(0.7, sc * 0.7); ctx.stroke(); // 얼음 빛 모서리
+      // 노드(균열 교차점) 살짝 강조
+      ctx.fillStyle = "rgba(210,234,250,0.30)";
+      for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.arc(X(nd[r][c].x), Y(nd[r][c].y), Math.max(0.6, sc * 0.9), 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     }
     // 깨진 얼음 테
