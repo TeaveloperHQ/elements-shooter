@@ -265,6 +265,21 @@
     for (let i = 0; i < n; i++) arr.push(0.58 + Math.random() * 0.55);
     return arr;
   }
+  // 협곡 '깎아지른 단면'(절벽 면) — 생성 시 한 번만 결정, 이후엔 원근으로 크기만 변함
+  // 좌표는 정규화(-1~1, 위에서 아래로 0~1). 기둥 개수/폭/높이/명암이 고정된다.
+  function makeStrata() {
+    const n = 7 + ((Math.random() * 4) | 0);          // 기둥 수 고정(7~10)
+    const cols = []; const ws = []; let sum = 0;
+    for (let i = 0; i < n; i++) { const w = 0.6 + Math.random() * 0.8; ws.push(w); sum += w; }
+    let x = -1;
+    for (let i = 0; i < n; i++) {
+      const w = ws[i] / sum * 2;                       // 폭 합이 2(=−1~1)
+      cols.push({ x: x, w: w, top: Math.random() * 0.5, tone: i % 2 });   // top: 부러진 윗면 깊이
+      x += w;
+    }
+    const joints = [0.34 + Math.random() * 0.1, 0.66 + Math.random() * 0.1];   // 가로 절리 위치(고정)
+    return { cols: cols, joints: joints };
+  }
   function spawnObstacle() {
     let r = Math.random();
     // 거대 협곡이 떠 있는 동안엔 보통 크레바스를 겹쳐 내보내지 않음
@@ -1454,14 +1469,13 @@
 
   // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
   // 들쭉날쭉 얼음 구멍(크레바스/협곡 공용)
-  function drawIceHole(cx, cy, rx, ry, sc, shp) {
+  function drawIceHole(cx, cy, rx, ry, sc, shp, strata) {
     const n = shp.length;
     function outline() {
       ctx.beginPath();
       for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n]; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
       ctx.closePath();
     }
-    const cols = Math.max(4, Math.round(rx / 18));
     ctx.save();
     const g = ctx.createRadialGradient(cx, cy - ry * 0.2, 1, cx, cy, Math.max(rx, ry));
     g.addColorStop(0, "#081f33"); g.addColorStop(0.5, "#143f5e"); g.addColorStop(1, "#3a7ca2");
@@ -1471,45 +1485,39 @@
     ctx.beginPath();
     for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr + ry * 0.18; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 주상절리(세로 기둥) 안쪽 뒷벽 — 얼음이 육각 기둥처럼 갈라진 단면
-    ctx.save();
-    outline(); ctx.clip();                                   // 구멍 안쪽으로만
-    const colN = Math.max(5, Math.round(rx / 13));
-    const topY = cy - ry * 0.92, botY = cy + ry * 0.45;
-    for (let k = 0; k < colN; k++) {
-      const x0 = cx + (k / colN - 0.5) * rx * 2.05;
-      const x1 = cx + ((k + 1) / colN - 0.5) * rx * 2.05;
-      const cw = x1 - x0;
-      const ty = topY + (shp[k % n] - 0.5) * ry * 0.55;      // 기둥별 부러진 윗면
-      // 기둥 면(위는 푸른 얼음, 아래로 갈수록 어둠 속으로)
-      const cg = ctx.createLinearGradient(0, ty, 0, botY);
-      const lit = (k % 2) ? 0.30 : 0.42;                     // 인접 기둥 명암 교차
-      cg.addColorStop(0, "rgba(150,196,228," + lit + ")");
-      cg.addColorStop(0.55, "rgba(60,110,150,0.18)");
-      cg.addColorStop(1, "rgba(10,32,54,0)");
-      ctx.fillStyle = cg; ctx.fillRect(x0, ty, cw + 0.8, botY - ty);
-      // 좌측 밝은 모서리(프리즘 면)
-      ctx.fillStyle = "rgba(206,232,250,0.34)"; ctx.fillRect(x0, ty, Math.max(0.8, cw * 0.16), botY - ty);
-      // 우측 깊은 이음새(기둥 사이 골)
-      ctx.fillStyle = "rgba(5,20,38,0.55)"; ctx.fillRect(x1 - Math.max(0.8, cw * 0.13), ty, Math.max(0.8, cw * 0.13), botY - ty);
-      // 윗면 얇은 하이라이트(기둥 끝)
-      ctx.fillStyle = "rgba(228,246,255,0.7)"; ctx.fillRect(x0 + cw * 0.16, ty, cw * 0.7, Math.max(0.8, sc));
+    // 깎아지른 협곡 단면(절벽 면) — 생성 시 고정된 패턴(strata)을 원근 크기에만 맞춰 확대
+    if (strata) {
+      ctx.save();
+      outline(); ctx.clip();                                 // 구멍 안쪽으로만
+      const topY = cy - ry * 0.92, botY = cy + ry * 0.5;
+      const wallH = botY - topY;
+      for (let k = 0; k < strata.cols.length; k++) {
+        const c = strata.cols[k];
+        const x0 = cx + c.x * rx, cw = c.w * rx;
+        const ty = topY + c.top * ry * 0.5;                  // 고정된 부러진 윗면
+        const cg = ctx.createLinearGradient(0, ty, 0, botY);
+        cg.addColorStop(0, "rgba(150,196,228," + (c.tone ? 0.30 : 0.42) + ")");
+        cg.addColorStop(0.55, "rgba(60,110,150,0.18)");
+        cg.addColorStop(1, "rgba(10,32,54,0)");
+        ctx.fillStyle = cg; ctx.fillRect(x0, ty, cw + 0.8, botY - ty);
+        ctx.fillStyle = "rgba(206,232,250,0.34)"; ctx.fillRect(x0, ty, Math.max(0.8, cw * 0.16), botY - ty);              // 밝은 모서리
+        ctx.fillStyle = "rgba(5,20,38,0.55)"; ctx.fillRect(x0 + cw - Math.max(0.8, cw * 0.13), ty, Math.max(0.8, cw * 0.13), botY - ty);  // 깊은 이음새
+        ctx.fillStyle = "rgba(228,246,255,0.7)"; ctx.fillRect(x0 + cw * 0.16, ty, cw * 0.7, Math.max(0.8, sc));          // 기둥 끝
+      }
+      // 가로 절리(고정 위치)
+      ctx.strokeStyle = "rgba(8,26,46,0.30)"; ctx.lineWidth = Math.max(0.8, sc * 0.8);
+      for (let h = 0; h < strata.joints.length; h++) {
+        const jy = topY + wallH * strata.joints[h];
+        ctx.beginPath(); ctx.moveTo(cx - rx, jy); ctx.lineTo(cx + rx, jy); ctx.stroke();
+      }
+      ctx.restore();
     }
-    // 가로 절리(기둥을 가로지르는 균열선)
-    ctx.strokeStyle = "rgba(8,26,46,0.32)"; ctx.lineWidth = Math.max(0.8, sc * 0.8);
-    for (let h = 1; h <= 2; h++) {
-      const jy = topY + (botY - topY) * (h / 2.6);
-      ctx.beginPath();
-      for (let k = 0; k <= colN; k++) { const px = cx + (k / colN - 0.5) * rx * 2.05, py = jy + (shp[(k + h) % n] - 0.5) * ry * 0.12; if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
-      ctx.stroke();
-    }
-    ctx.restore();
     // 깨진 얼음 테
     ctx.strokeStyle = "rgba(228,246,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
-    // 서리 알갱이
+    // 서리 알갱이(고정 개수)
     ctx.fillStyle = "rgba(238,249,255,0.85)";
-    for (let k = 0; k < Math.max(5, cols); k++) { const a = 0.4 + k * 1.27; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, cy + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.2 * sc), 0, Math.PI * 2); ctx.fill(); }
+    for (let k = 0; k < n; k++) { const a = 0.4 + k * 1.27; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, cy + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.2 * sc), 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
   }
 
@@ -1526,8 +1534,9 @@
   }
 
   function drawCrevasse(o) {
+    if (!o.strata) o.strata = makeStrata();      // 단면 패턴은 생성 시 한 번만 고정
     const G = holeGeom(o, 0.26);
-    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape);
+    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape, o.strata);
     ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
     ctx.font = "bold " + (9 * G.sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", G.cx, G.cy - G.ry - 8 * G.sc);
     ctx.textAlign = "start"; ctx.restore();
@@ -1535,8 +1544,9 @@
 
   // 거대 협곡 = 좌우로 넓힌 크레바스(판정 구간 중심에 맞춰 그림)
   function drawCanyon(o) {
+    if (!o.strata) o.strata = makeStrata();      // 단면 패턴은 생성 시 한 번만 고정
     const G = holeGeom(o, 0.15);
-    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape);
+    drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape, o.strata);
     ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center"; ctx.fillStyle = "#ffd07a";
     ctx.font = "bold " + (11 * G.sc + 6) + "px sans-serif";
     ctx.fillText("🪽 날아서 건너기!", G.cx, G.cy - G.ry - 9 * G.sc);
