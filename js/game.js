@@ -1745,16 +1745,20 @@
     if (o.canyon) drawCanyon(o); else drawCrevasse(o);
   }
 
-  // 서울 비밀 지점 마커(💜) — 여기서 점프하면 mina 이스터에그
+  // 서울 비밀 지점 마커 — 오징어게임 바닥 무늬(원·삼각·사각). 여기서 점프하면 이스터에그
   function drawSecret(o) {
     const x = laneToX(o.p, o.lane), y = projY(o.p), sc = projScale(o.p);
     const pulse = 0.6 + 0.4 * Math.sin(o.pulse || 0);
+    const u = 6.5 * sc;
     ctx.save();
-    ctx.fillStyle = "rgba(255,140,210,0.35)"; ctx.beginPath(); ctx.ellipse(x, y, 14 * sc * pulse, 4 * sc * pulse, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.6 + 0.4 * pulse; ctx.textAlign = "center";
-    ctx.font = "bold " + (15 * sc) + "px sans-serif"; ctx.fillStyle = "#ff7ad0";
-    ctx.fillText("💜", x, y - 9 * sc - 5 * pulse);
-    ctx.textAlign = "start"; ctx.restore();
+    ctx.translate(x, y);
+    ctx.scale(1, 0.5);                         // 바닥에 그린 듯 원근으로 눌림
+    ctx.globalAlpha = 0.5 + 0.4 * pulse;
+    ctx.strokeStyle = "#ff2e74"; ctx.lineWidth = Math.max(1.4, 1.9 * sc); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.rect(-u, 0.2 * u, 2 * u, 1.7 * u); ctx.stroke();                 // 몸통(사각)
+    ctx.beginPath(); ctx.moveTo(-u, 0.2 * u); ctx.lineTo(0, -1.4 * u); ctx.lineTo(u, 0.2 * u); ctx.stroke();   // 삼각
+    ctx.beginPath(); ctx.arc(0, -2.3 * u, 0.95 * u, 0, Math.PI * 2); ctx.stroke();        // 머리(원)
+    ctx.restore();
   }
 
   // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
@@ -2181,6 +2185,7 @@
     const ki = STAGES.findIndex(function (s) { return s.key === "korea"; });
     distance = ki * STAGE_LEN + STAGE_LEN * 0.5;
     minaT = 6.5;
+    items.push({ type: "secret", lane: 0, p: 0.7, vp: 0, pulse: 1.2, done: false });
   }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
