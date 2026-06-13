@@ -631,7 +631,7 @@
     items = items.filter(function (o) { return o.type !== "hole"; });          // 남은 크레바스 제거
     supply = [];
     const hp = 8 + lap * 3;                                                     // 랩마다 강해짐
-    boss = { kind: bossKind(), hp: hp, maxHp: hp, lane: 0, p: 0.46, bob: 0, atkT: 1.6, hitFlash: 0, intro: 1.4, win: 0 };
+    boss = { kind: bossKind(), hp: hp, maxHp: hp, lane: 0, p: 0.46, bob: 0, atkT: 1.6, hitFlash: 0, intro: 1.4, win: 0, throwT: 0, aimLane: 0 };
     bossCanTimer = 0;
     bannerT = 2.6; bannerStage = 0; bannerText = "⚔ " + bossName() + " 등장!";
     showToast("🥫 모아둔 통조림을 던져 " + bossName() + "을(를) 쓰러뜨리세요! (탭=던지기)", true);
@@ -677,13 +677,22 @@
       }
     }
 
-    // 보스 공격: 눈덩이를 펭귄 쪽으로(소개 연출 후)
-    if (boss.intro <= 0) {
+    // 보스 공격: 와인드업 → 발사(곰=눈덩이 던지기, 바다표범=물대포). 소개 연출 후
+    if (boss.throwT > 0) {
+      const prev = boss.throwT; boss.throwT -= dt;
+      if (prev > 0.22 && boss.throwT <= 0.22) {                  // 릴리즈 순간 발사
+        const water = (boss.kind === "seal");
+        const mz = projY(boss.p) - 16 * projScale(boss.p);       // 입/팔 높이
+        shots.push({ kind: water ? "water" : "snow", lane: boss.lane, p: boss.p, aim: boss.aimLane, vp: 0.85 + lap * 0.08, wob: Math.random() * 6.28 });
+        spawnParticles(laneToX(boss.p, boss.lane), mz, water ? "#8fe0ff" : "#eaf4ff", water ? 12 : 7, water ? 200 : 150);
+        SND.bad();
+      }
+    }
+    if (boss.intro <= 0 && boss.throwT <= 0) {
       boss.atkT -= dt;
       if (boss.atkT <= 0) {
         boss.atkT = Math.max(0.65, 1.7 - lap * 0.18);
-        shots.push({ kind: "snow", lane: boss.lane, p: boss.p, aim: playerLane() + (Math.random() - 0.5) * 0.5, vp: 0.85 + lap * 0.08 });
-        SND.bad();
+        boss.throwT = 0.5; boss.aimLane = playerLane() + (Math.random() - 0.5) * 0.5;   // 조준 고정 후 와인드업
       }
     }
 
@@ -721,7 +730,7 @@
       if (s.p >= 0.98) {
         const sx = laneToX(1, s.lane);
         if (Math.abs(player.x - sx) < 26 && player.jumpY < 30) loseLife(bossName() + "의 공격에 맞았다!");
-        else spawnParticles(sx, playerLineY() + 6, "#e8f4ff", 8, 150);
+        else spawnParticles(sx, playerLineY() + 6, s.kind === "water" ? "#8fe0ff" : "#e8f4ff", 10, 170);
         shots.splice(i, 1);
       }
     }
@@ -748,57 +757,71 @@
     ctx.save();
     ctx.translate(x, y);
     if (boss.win > 0) { const f = 1 - boss.win / 1.6; ctx.rotate(f * 0.5); ctx.globalAlpha = Math.max(0, 1 - f); }
-    if (boss.kind === "bear") drawBear(s, boss.bob, boss.hitFlash > 0);
-    else drawSeal(s, boss.bob, boss.hitFlash > 0);
+    if (boss.kind === "bear") drawBear(s, boss.bob, boss.hitFlash > 0, boss.throwT);
+    else drawSeal(s, boss.bob, boss.hitFlash > 0, boss.throwT);
     ctx.restore();
   }
+  // 던지기 진행도(throwT)에 따른 팔/몸 스윙: 와인드업(뒤로) → 릴리즈(앞으로)
+  function throwArmAngle(throwT, neutral, up, fwd) {
+    if (throwT > 0.22) { const w = (0.5 - throwT) / 0.28; return neutral + (up - neutral) * Math.min(1, w); }
+    if (throwT > 0) { const r = (0.22 - throwT) / 0.22; return up + (fwd - up) * r; }
+    return neutral;
+  }
 
-  // 북극곰 — 긴 주둥이·어깨 험프·발톱(인형 느낌 ↓, 맹수 느낌 ↑)
-  function drawBear(s, t, hurt) {
+  // 북극곰 — 어깨에 붙은 팔, 오른팔은 던지기 와인드업→릴리즈로 스윙
+  function drawBear(s, t, hurt, throwT) {
     const lit = hurt ? "#ffe0e0" : "#f6fbff", body = hurt ? "#f4bcbc" : "#dde9f6", shade = hurt ? "#e09c9c" : "#bdd2e8";
     const claw = "#9fb3c6";
-    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 6) * 1.5);
-    ctx.fillStyle = "rgba(40,80,120,0.22)"; ctx.beginPath(); ctx.ellipse(0, 29, 26, 6, 0, 0, Math.PI * 2); ctx.fill();
+    const winding = throwT > 0.22;
+    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 6) * 1.4);
+    // 그림자
+    ctx.fillStyle = "rgba(40,80,120,0.22)"; ctx.beginPath(); ctx.ellipse(0, 29, 25, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 뒷다리 + 발톱
     ctx.fillStyle = shade;
-    ctx.beginPath(); ctx.ellipse(-12, 23, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(12, 23, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-11, 23, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(11, 23, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = claw;
-    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(-12 + i * 4, 31, 1.2, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(12 + i * 4, 31, 1.2, 2.4, 0, 0, Math.PI * 2); ctx.fill(); }
-    // 몸통(밝음) + 우측 그늘면 + 어깨 험프
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(-11 + i * 4, 31, 1.2, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(11 + i * 4, 31, 1.2, 2.4, 0, 0, Math.PI * 2); ctx.fill(); }
+    // 쉬는 왼팔(어깨에서 아래로) — 몸통 뒤에서 살짝 보이게 먼저
+    function paw(len) { ctx.fillStyle = shade; ctx.beginPath(); ctx.ellipse(0, len, 5.2, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = claw; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(i * 2.3, len + 10, 1, 2.2, 0, 0, Math.PI * 2); ctx.fill(); } }
+    ctx.save(); ctx.translate(-15, -7); ctx.rotate(0.32); paw(9); ctx.restore();
+    // 몸통(밝음) + 우측 그늘 + 어깨 험프
     ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.ellipse(0, 5, 21, 23, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(9, 7, 12, 20, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = lit; ctx.beginPath(); ctx.ellipse(0, -11, 16, 11, 0, Math.PI, 0); ctx.fill();
-    // 팔(던지는 자세) + 발톱
-    ctx.fillStyle = shade;
-    ctx.beginPath(); ctx.ellipse(-21, -8, 6, 12, 0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(21, -14, 6, 12, -0.7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = claw;
-    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(-24 + i * 2.4, -17, 1, 2.2, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(24 + i * 2.4, -22, 1, 2.2, -0.4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(0, 5, 20, 23, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(8, 7, 12, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = lit; ctx.beginPath(); ctx.ellipse(0, -12, 15, 11, 0, Math.PI, 0); ctx.fill();
     // 머리 + 낮고 작은 귀
     ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(0, -22, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(-10, -30, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(10, -30, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#c9d9ea"; ctx.beginPath(); ctx.arc(-10, -30, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(10, -30, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -23, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-10, -31, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(10, -31, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#c9d9ea"; ctx.beginPath(); ctx.arc(-10, -31, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(10, -31, 1.8, 0, Math.PI * 2); ctx.fill();
     // 주둥이(앞으로 돌출)
-    ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.beginPath(); ctx.ellipse(0, -13, 9, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#11181f"; ctx.beginPath(); ctx.ellipse(0, -15.5, 3.2, 2.4, 0, 0, Math.PI * 2); ctx.fill();   // 코
-    ctx.strokeStyle = "rgba(30,40,52,0.6)"; ctx.lineWidth = 0.8;                                                  // 입
-    ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(0, -9.5); ctx.moveTo(0, -9.5); ctx.quadraticCurveTo(-4, -8.5, -5, -10.5); ctx.moveTo(0, -9.5); ctx.quadraticCurveTo(4, -8.5, 5, -10.5); ctx.stroke();
+    ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.beginPath(); ctx.ellipse(0, -15, 8.5, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#11181f"; ctx.beginPath(); ctx.ellipse(0, -17.5, 3, 2.2, 0, 0, Math.PI * 2); ctx.fill();   // 코
+    ctx.strokeStyle = "rgba(30,40,52,0.6)"; ctx.lineWidth = 0.8;                                                // 입
+    ctx.beginPath(); ctx.moveTo(0, -15.5); ctx.lineTo(0, -12.5); ctx.moveTo(0, -12.5); ctx.quadraticCurveTo(-3.5, -11.5, -4.5, -13.5); ctx.moveTo(0, -12.5); ctx.quadraticCurveTo(3.5, -11.5, 4.5, -13.5); ctx.stroke();
     // 눈(사납게) + 하이라이트
     ctx.fillStyle = "#11181f";
-    ctx.beginPath(); ctx.ellipse(-6, -24, 2, 2.6, 0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(6, -24, 2, 2.6, -0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-6.6, -25, 0.7, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(5.4, -25, 0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-6, -25, 2, 2.6, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6, -25, 2, 2.6, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-6.6, -26, 0.7, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(5.4, -26, 0.7, 0, Math.PI * 2); ctx.fill();
+    // 던지는 오른팔(앞쪽) — 어깨 피벗에서 스윙. 와인드업 땐 눈덩이를 들고 있음
+    ctx.save();
+    ctx.translate(15, -8);
+    ctx.rotate(throwArmAngle(throwT, 0.35, -2.2, 0.7));
+    paw(11);
+    if (winding) { ctx.fillStyle = "#f2f9ff"; ctx.strokeStyle = "#cfe3f2"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 22, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
     ctx.restore();
   }
 
-  // 바다표범 — 통통한 물방울 몸 + 반점·큰 눈·지느러미·수염
-  function drawSeal(s, t, hurt) {
+  // 바다표범 — 물대포(입에서 물 분사). 와인드업 땐 뒤로 젖혔다가 릴리즈에 앞으로 분사
+  function drawSeal(s, t, hurt, throwT) {
     const lit = hurt ? "#ffd6d6" : "#b3c3d2", body = hurt ? "#e6a8a8" : "#8ca2b6", shade = hurt ? "#d49090" : "#6c8398";
-    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 5) * 1.3);
+    const lunge = -throwArmAngle(throwT, 0, 1, -1.4);     // 와인드업 +(뒤로 젖힘)/릴리즈 -(앞으로)
+    const firing = throwT > 0 && throwT <= 0.22;
+    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 5) * 1.3 - lunge * 1.5);
     ctx.fillStyle = "rgba(40,80,120,0.22)"; ctx.beginPath(); ctx.ellipse(0, 29, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
     // 꼬리 지느러미(뒤, 양갈래)
     ctx.fillStyle = shade;
@@ -808,7 +831,6 @@
     ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.ellipse(0, 6, 18, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(7, 9, 11, 19, 0, 0, Math.PI * 2); ctx.fill();
-    // 반점
     ctx.fillStyle = "rgba(60,80,98,0.5)";
     const spots = [[-7, 2], [3, 9], [-2, 15], [9, 4], [-9, 11], [2, -2], [6, 16]];
     for (const sp of spots) { ctx.beginPath(); ctx.ellipse(sp[0], sp[1], 1.7, 1.2, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -816,21 +838,22 @@
     ctx.fillStyle = shade;
     ctx.beginPath(); ctx.ellipse(-15, 9, 5, 12, 0.5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(15, 9, 5, 12, -0.5, 0, Math.PI * 2); ctx.fill();
-    // 머리 + 주둥이
+    // 머리(와인드업 때 살짝 뒤로 젖힘)
+    ctx.save(); ctx.translate(0, -16); ctx.rotate(lunge * 0.18);
     ctx.fillStyle = lit; ctx.strokeStyle = shade; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(0, -16, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(0, -10, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#11181f"; ctx.beginPath(); ctx.ellipse(0, -11, 3, 2.4, 0, 0, Math.PI * 2); ctx.fill();         // 코
-    ctx.strokeStyle = "rgba(20,28,40,0.7)"; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(0, -7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 주둥이 / 입(분사 중엔 크게 벌림)
+    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(0, 6, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (firing) { ctx.fillStyle = "#0d2230"; ctx.beginPath(); ctx.ellipse(0, 7, 3.6, 3, 0, 0, Math.PI * 2); ctx.fill();   // 벌린 입
+      ctx.fillStyle = "rgba(140,220,255,0.9)"; ctx.beginPath(); ctx.moveTo(-2.5, 8); ctx.lineTo(2.5, 8); ctx.lineTo(1.2, 16); ctx.lineTo(-1.2, 16); ctx.closePath(); ctx.fill(); }   // 입에서 물줄기
+    else { ctx.fillStyle = "#11181f"; ctx.beginPath(); ctx.ellipse(0, 5, 3, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "rgba(20,28,40,0.7)"; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(0, 7); ctx.lineTo(0, 9); ctx.stroke(); }
     // 큰 눈 + 하이라이트
-    ctx.fillStyle = "#11181f";
-    ctx.beginPath(); ctx.arc(-6, -19, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(6, -19, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-7, -20, 1, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(5, -20, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#11181f"; ctx.beginPath(); ctx.arc(-6, -3, 3, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(6, -3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-7, -4, 1, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(5, -4, 1, 0, Math.PI * 2); ctx.fill();
     // 수염
     ctx.strokeStyle = "rgba(240,248,255,0.75)"; ctx.lineWidth = 0.6;
-    ctx.beginPath(); ctx.moveTo(-3, -10); ctx.lineTo(-13, -11); ctx.moveTo(-3, -9); ctx.lineTo(-13, -8);
-    ctx.moveTo(3, -10); ctx.lineTo(13, -11); ctx.moveTo(3, -9); ctx.lineTo(13, -8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-3, 6); ctx.lineTo(-13, 5); ctx.moveTo(-3, 7); ctx.lineTo(-13, 8); ctx.moveTo(3, 6); ctx.lineTo(13, 5); ctx.moveTo(3, 7); ctx.lineTo(13, 8); ctx.stroke();
+    ctx.restore();
     ctx.restore();
   }
 
@@ -845,7 +868,15 @@
         ctx.fillStyle = s.color || "#69c"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(s.sym || "", 0, 2); ctx.textAlign = "start";
         ctx.restore();
-      } else {
+      } else if (s.kind === "water") {            // 바다표범 물대포
+        ctx.save(); ctx.translate(x, y - 10 * sc);
+        ctx.fillStyle = "rgba(120,210,255,0.32)"; ctx.beginPath(); ctx.ellipse(0, -7 * sc, 4.5 * sc, 11 * sc, 0, 0, Math.PI * 2); ctx.fill();   // 물줄기 꼬리
+        const wob = Math.sin((s.wob || 0) + s.p * 20) * 1.5 * sc;
+        ctx.fillStyle = "rgba(80,185,245,0.92)"; ctx.strokeStyle = "rgba(205,240,255,0.85)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(wob, 0, 7 * sc, 8 * sc, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.beginPath(); ctx.arc(wob - 2 * sc, -2 * sc, 2 * sc, 0, Math.PI * 2); ctx.fill();   // 하이라이트
+        ctx.restore();
+      } else {                                     // 눈덩이(북극곰)
         ctx.save(); ctx.translate(x, y - 10 * sc);
         ctx.fillStyle = "rgba(180,210,235,0.45)"; ctx.beginPath(); ctx.arc(0, 0, 9 * sc, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = "#f2f9ff"; ctx.strokeStyle = "#bcd6e8"; ctx.lineWidth = 1;
@@ -2191,6 +2222,8 @@
     stored = [];
     for (let i = 0; i < 6; i++) { const e = BUFF_ELEMENTS[i % BUFF_ELEMENTS.length]; stored.push({ symbol: e.symbol, name: e.name, color: e.color }); }
     startBoss();
+    const pm = location.search.match(/pose=([\d.]+)/);   // 포즈 고정(공격 모션 확인용)
+    if (pm) { boss.intro = 0; boss.lane = 0; boss.throwT = +pm[1]; galleryMode = true; }
   }
   // ?mina: 서울 이스터에그(롯데타워 MINA + 불꽃놀이) 미리보기
   if (location.search.indexOf("mina") >= 0) {
