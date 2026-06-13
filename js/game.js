@@ -1156,23 +1156,62 @@
   function bgMoai(hy) {
     ctx.fillStyle = "rgba(120,170,150,0.9)";
     ctx.beginPath(); ctx.moveTo(0, hy); for (let x = 0; x <= W; x += 36) ctx.lineTo(x, hy - 9 - Math.sin(x * 0.013) * 7); ctx.lineTo(W, hy); ctx.closePath(); ctx.fill();
-    const pos = [[0.16, 46], [0.4, 62], [0.63, 50], [0.84, 40]];
+    const pos = [[0.15, 54], [0.39, 68], [0.63, 56], [0.85, 46]];
     for (const p of pos) {
-      const cx = W * p[0], h = p[1], w = h * 0.52, base = hy - 6;
-      ctx.fillStyle = "rgba(98,106,114,0.96)";
-      ctx.beginPath(); ctx.moveTo(cx - w / 2, base); ctx.lineTo(cx - w / 2, base - h * 0.6);
-      ctx.quadraticCurveTo(cx - w / 2, base - h, cx, base - h); ctx.quadraticCurveTo(cx + w / 2, base - h, cx + w / 2, base - h * 0.6);
-      ctx.lineTo(cx + w / 2, base); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(72,80,88,0.96)"; ctx.fillRect(cx + w * 0.12, base - h * 0.6, w * 0.38, h * 0.6);
-      ctx.fillStyle = "rgba(56,63,71,0.85)"; ctx.fillRect(cx - w * 0.09, base - h * 0.72, w * 0.18, h * 0.5);
-      ctx.fillStyle = "rgba(44,50,58,0.7)"; ctx.fillRect(cx - w * 0.34, base - h * 0.78, w * 0.17, h * 0.07); ctx.fillRect(cx + w * 0.17, base - h * 0.78, w * 0.17, h * 0.07);
+      const cx = W * p[0], h = p[1], w = h * 0.5, base = hy - 5;
+      const dir = (cx < W * 0.5) ? 1 : -1;            // 도로 안쪽을 바라보는 옆얼굴
+      ctx.save(); ctx.translate(cx, base); ctx.scale(dir, 1);
+      const X = w, Y = h;
+      // 옆얼굴 실루엣(큰 머리 + 돌출 이마/긴 코/턱 + 몸통)
+      ctx.fillStyle = "rgba(104,112,120,0.96)";
+      ctx.beginPath();
+      ctx.moveTo(-0.36 * X, -0.92 * Y);               // 뒤통수 위
+      ctx.lineTo(0.12 * X, -1.0 * Y);                 // 정수리(앞으로 기욺)
+      ctx.lineTo(0.46 * X, -0.82 * Y);                // 이마
+      ctx.lineTo(0.54 * X, -0.75 * Y);                // 눈썹(돌출)
+      ctx.lineTo(0.37 * X, -0.71 * Y);                // 눈 우묵
+      ctx.lineTo(0.44 * X, -0.67 * Y);                // 콧대
+      ctx.lineTo(0.62 * X, -0.5 * Y);                 // 코끝(길게 돌출)
+      ctx.lineTo(0.37 * X, -0.47 * Y);                // 코 밑
+      ctx.lineTo(0.47 * X, -0.41 * Y);                // 입
+      ctx.lineTo(0.5 * X, -0.33 * Y);                 // 턱(돌출)
+      ctx.lineTo(0.3 * X, -0.27 * Y);                 // 턱 밑
+      ctx.lineTo(0.32 * X, 0);                        // 몸통 앞
+      ctx.lineTo(-0.36 * X, 0);                       // 뒤통수 아래(몸통 뒤)
+      ctx.closePath(); ctx.fill();
+      // 뒤쪽 그늘면
+      ctx.fillStyle = "rgba(80,88,96,0.92)";
+      ctx.beginPath(); ctx.moveTo(-0.36 * X, -0.92 * Y); ctx.lineTo(-0.06 * X, -0.96 * Y); ctx.lineTo(-0.06 * X, 0); ctx.lineTo(-0.36 * X, 0); ctx.closePath(); ctx.fill();
+      // 눈 그늘(눈썹 밑)
+      ctx.fillStyle = "rgba(52,58,66,0.7)";
+      ctx.beginPath(); ctx.moveTo(0.36 * X, -0.73 * Y); ctx.lineTo(0.47 * X, -0.75 * Y); ctx.lineTo(0.42 * X, -0.68 * Y); ctx.closePath(); ctx.fill();
+      // 긴 귀(옆면)
+      ctx.strokeStyle = "rgba(74,82,90,0.85)"; ctx.lineWidth = Math.max(1.2, w * 0.07);
+      ctx.beginPath(); ctx.moveTo(0.04 * X, -0.78 * Y); ctx.lineTo(0.06 * X, -0.52 * Y); ctx.stroke();
+      ctx.restore();
     }
   }
-  // 미국 — 도시 스카이라인 + 자유의 여신상
+  // 미국 — 금문교 + 도시 스카이라인 + 자유의 여신상
   function bgCity(hy) {
     const lit = "rgba(120,150,186,0.95)", shade = "rgba(86,116,156,0.95)";
     const bs = [[0.03, 30, 36], [0.11, 46, 44], [0.19, 64, 52], [0.30, 40, 40], [0.55, 50, 46], [0.66, 72, 56], [0.77, 44, 42], [0.88, 58, 50]];
     for (const b of bs) bgBldg(W * b[0], hy, b[1], b[2], lit, shade, true);
+    // 금문교(좌측 전경) — 붉은 현수교
+    (function () {
+      const gx0 = -W * 0.02, gx1 = W * 0.38, t1 = W * 0.09, t2 = W * 0.29, deckY = hy - 12, topY = hy - 78;
+      const red = "rgba(198,76,52,0.96)", redD = "rgba(150,52,38,0.96)";
+      const cableY = function (xx) { const tt = (xx - t1) / (t2 - t1); return topY + (deckY + 5 - topY) * 4 * tt * (1 - tt); };
+      ctx.fillStyle = redD; ctx.fillRect(gx0, deckY, gx1 - gx0, 3);                 // 데크
+      ctx.strokeStyle = red; ctx.lineWidth = 2.4; ctx.lineJoin = "round";           // 메인 케이블
+      ctx.beginPath(); ctx.moveTo(gx0, deckY - 1); ctx.lineTo(t1, topY);
+      ctx.quadraticCurveTo((t1 + t2) / 2, deckY + 8, t2, topY); ctx.lineTo(gx1, deckY - 1); ctx.stroke();
+      ctx.strokeStyle = "rgba(198,76,52,0.55)"; ctx.lineWidth = 0.8;                 // 행어(수직 케이블)
+      for (let i = 1; i < 9; i++) { const xx = t1 + (t2 - t1) * i / 9; ctx.beginPath(); ctx.moveTo(xx, cableY(xx)); ctx.lineTo(xx, deckY); ctx.stroke(); }
+      for (const tx of [t1, t2]) {                                                  // 주탑(가로보 2단)
+        ctx.fillStyle = red; ctx.fillRect(tx - 2.6, topY - 6, 5.2, hy - (topY - 6));
+        ctx.fillStyle = redD; ctx.fillRect(tx - 6, topY + 8, 12, 2.6); ctx.fillRect(tx - 6, topY + 30, 12, 2.6);
+      }
+    })();
     const cx = W * 0.43, base = hy, h = 80, g = "rgba(150,198,178,0.96)";
     ctx.fillStyle = g; ctx.fillRect(cx - 12, base - h * 0.18, 24, h * 0.18);
     ctx.beginPath(); ctx.moveTo(cx - 9, base - h * 0.18); ctx.lineTo(cx - 5, base - h * 0.7); ctx.lineTo(cx + 5, base - h * 0.7); ctx.lineTo(cx + 9, base - h * 0.18); ctx.closePath(); ctx.fill();
@@ -1493,7 +1532,8 @@
       if (d.type === "landmark") {
         ctx.fillStyle = "rgba(40,80,120,0.16)";
         ctx.beginPath(); ctx.ellipse(x, y, 22 * base, 5 * base, 0, 0, Math.PI * 2); ctx.fill();
-        drawLandmarkIcon(d.icon || stageLandmark().icon, d.name || "", x, y, base);
+        if (d.key === "pisa") drawPizzeria(x, y, base);     // 이탈리아: 피자 대신 피자리아 가게
+        else drawLandmarkIcon(d.icon || stageLandmark().icon, d.name || "", x, y, base);
         continue;
       }
       const sc = base * 1.15;
@@ -1528,6 +1568,34 @@
     ctx.restore();
     // 살짝 반짝임
     oSparkle(x + 11 * s, y - fs * 0.7, 2 * s, "rgba(255,255,255,0.85)");
+  }
+
+  // ---------- 이탈리아 길가: 피자리아 가게 ----------
+  function drawPizzeria(x, y, s) {
+    const w = 34 * s, h = 30 * s, bx = x - w / 2, by = y - h;
+    // 벽
+    ctx.fillStyle = "#ecdfc6"; ctx.strokeStyle = "rgba(120,100,72,0.5)"; ctx.lineWidth = Math.max(1, s);
+    ctx.fillRect(bx, by, w, h); ctx.strokeRect(bx, by, w, h);
+    ctx.fillStyle = "rgba(0,0,0,0.06)"; ctx.fillRect(bx + w * 0.62, by, w * 0.38, h);   // 우측 음영
+    // 붉은 기와 지붕
+    ctx.fillStyle = "#b5532f"; ctx.beginPath(); ctx.moveTo(bx - 4 * s, by); ctx.lineTo(x, by - 9 * s); ctx.lineTo(bx + w + 4 * s, by); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.moveTo(x, by - 9 * s); ctx.lineTo(bx + w + 4 * s, by); ctx.lineTo(x, by); ctx.closePath(); ctx.fill();
+    // 간판 "PIZZERIA"(녹색)
+    ctx.fillStyle = "#2e7d46"; ctx.fillRect(bx + 1.5 * s, by + 2.5 * s, w - 3 * s, 7 * s);
+    ctx.fillStyle = "#fff"; ctx.font = "bold " + (4.4 * s) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("PIZZERIA", x, by + 6.2 * s);
+    // 삼색 차양(녹-백-적)
+    const ay = by + 11 * s, aw = w + 3 * s, ax = x - aw / 2, ah = 5.5 * s, n = 9, tri = ["#2e7d46", "#ffffff", "#d23b34"];
+    for (let i = 0; i < n; i++) { ctx.fillStyle = tri[i % 3]; ctx.beginPath(); ctx.moveTo(ax + aw * i / n, ay); ctx.lineTo(ax + aw * (i + 1) / n, ay); ctx.lineTo(ax + aw * (i + 0.5) / n, ay + ah); ctx.closePath(); ctx.fill(); }
+    // 문
+    ctx.fillStyle = "#6b4a2a"; ctx.fillRect(x + w * 0.12, y - 13 * s, 9 * s, 13 * s);
+    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(x + w * 0.12 + 1 * s, y - 13 * s, 2 * s, 13 * s);
+    // 둥근 피자 간판(도우+페퍼로니)
+    const pr = 6.5 * s, pcx = bx + w * 0.26, pcy = y - 9 * s;
+    ctx.fillStyle = "#e7b24c"; ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#c98a2e"; ctx.lineWidth = Math.max(0.8, s); ctx.stroke();
+    ctx.fillStyle = "#d23b34"; for (const d of [[-2, -1], [2, 0], [-1, 2.5], [2.4, 2.4], [0, -2.8]]) { ctx.beginPath(); ctx.arc(pcx + d[0] * s, pcy + d[1] * s, 1.1 * s, 0, Math.PI * 2); ctx.fill(); }
+    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
   }
 
   // ---------- 전세계 명물 얼음조각(미사용: 아이콘 방식으로 대체) ----------
