@@ -281,10 +281,9 @@
       }
       nodes.push(row);
     }
-    const diags = [];                                  // 고정 대각 균열 몇 가닥(그물 불규칙하게)
-    const dn = 2 + ((Math.random() * 3) | 0);
-    for (let i = 0; i < dn; i++) diags.push([(Math.random() * rows) | 0, (Math.random() * cols) | 0, Math.random() < 0.5 ? 1 : -1]);
-    return { nodes: nodes, rows: rows, cols: cols, diags: diags };
+    const jit = [];                                    // 셀(면)별 명암 지터 — 색차 경계용(고정)
+    for (let r = 0; r < rows; r++) { const jr = []; for (let c = 0; c < cols; c++) jr.push((Math.random() * 2 - 1) * 9); jit.push(jr); }
+    return { nodes: nodes, rows: rows, cols: cols, jit: jit };
   }
   function spawnObstacle() {
     let r = Math.random();
@@ -1491,34 +1490,34 @@
     ctx.beginPath();
     for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr + ry * 0.18; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 협곡 단면의 랜덤 그물(균열망) — 고정 패턴을 원근 크기에만 맞춰 확대
+    // 협곡 단면 — 그물 셀을 두 톤 면으로 채워 색차로 경계 표현(배경 산 방식),
+    // 아래로 갈수록 좁아지게(깊이로 수렴) 그린다. 패턴은 고정, 원근으로 크기만 변함.
     if (strata && strata.nodes) {
       ctx.save();
-      outline(); ctx.clip();                                 // 구멍 안쪽으로만
-      const topY = cy - ry * 0.85, botY = cy + ry * 0.6, wallH = botY - topY;
-      const nd = strata.nodes, rows = strata.rows, cols = strata.cols;
-      const X = function (x) { return cx + x * rx * 0.98; };
-      const Y = function (y) { return topY + y * wallH; };
-      // 그물 균열 경로(가로·세로 + 고정 대각)
-      function netPath() {
+      outline(); ctx.clip();
+      const topY = cy - ry * 0.85, botY = cy + ry * 0.62, wallH = botY - topY;
+      const taper = 0.52;                                    // 바닥 폭 = 위 폭의 (1−taper)
+      const nd = strata.nodes, rows = strata.rows, cols = strata.cols, jit = strata.jit;
+      const SX = function (nx, ny) { return cx + nx * rx * (1 - ny * taper); };   // 아래로 수렴
+      const SY = function (ny) { return topY + ny * wallH; };
+      const TOP = [148, 190, 222], BOT = [11, 30, 51];        // 위:얼음 빛 / 아래:심연
+      const cl = function (v) { return v < 0 ? 0 : v > 255 ? 255 : v | 0; };
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const a = nd[r][c], b = nd[r][c + 1], d = nd[r + 1][c + 1], e = nd[r + 1][c];
+        const depth = Math.min(1, (a.y + b.y + d.y + e.y) / 4 * 1.12);
+        const tone = (((r + c) & 1) ? 12 : -12) + jit[r][c];  // 체커 + 고정 지터 → 면마다 색차
+        const R = cl(TOP[0] + (BOT[0] - TOP[0]) * depth + tone);
+        const G = cl(TOP[1] + (BOT[1] - TOP[1]) * depth + tone);
+        const B = cl(TOP[2] + (BOT[2] - TOP[2]) * depth + tone);
+        ctx.fillStyle = ctx.strokeStyle = "rgb(" + R + "," + G + "," + B + ")";
+        ctx.lineWidth = 0.8;                                  // 같은 색 얇은 테두리로 면 사이 빈틈 메움
         ctx.beginPath();
-        for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
-          const a = nd[r][c];
-          if (c < cols) { const b = nd[r][c + 1]; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
-          if (r < rows) { const b = nd[r + 1][c]; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
-        }
-        for (let i = 0; i < strata.diags.length; i++) {
-          const d = strata.diags[i], r = d[0], c = d[1], dir = d[2];
-          const cc = dir > 0 ? c : c + 1, a = nd[r][cc], b = nd[r + 1][dir > 0 ? c + 1 : c];
-          ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y));
-        }
+        ctx.moveTo(SX(a.x, a.y), SY(a.y));
+        ctx.lineTo(SX(b.x, b.y), SY(b.y));
+        ctx.lineTo(SX(d.x, d.y), SY(d.y));
+        ctx.lineTo(SX(e.x, e.y), SY(e.y));
+        ctx.closePath(); ctx.fill(); ctx.stroke();
       }
-      ctx.lineCap = "round"; ctx.lineJoin = "round";
-      netPath(); ctx.strokeStyle = "rgba(6,20,38,0.5)"; ctx.lineWidth = Math.max(1.4, sc * 1.6); ctx.stroke();   // 깊은 골
-      netPath(); ctx.strokeStyle = "rgba(190,222,246,0.32)"; ctx.lineWidth = Math.max(0.7, sc * 0.7); ctx.stroke(); // 얼음 빛 모서리
-      // 노드(균열 교차점) 살짝 강조
-      ctx.fillStyle = "rgba(210,234,250,0.30)";
-      for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.arc(X(nd[r][c].x), Y(nd[r][c].y), Math.max(0.6, sc * 0.9), 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     }
     // 깨진 얼음 테
