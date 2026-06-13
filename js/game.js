@@ -999,6 +999,164 @@
     ctx.textAlign = "start";
   }
 
+  // ===================== 나라별 지평선 배경 =====================
+  function drawBackdrop(hy) {
+    const ord = Math.max(0, Math.min(STAGES.length - 1, lapDist() / STAGE_LEN));
+    const ordi = Math.floor(ord), frac = ord - ordi;
+    const idxOf = function (o) { o = Math.max(0, Math.min(STAGES.length - 1, o)); return (lap % 2 === 0) ? o : (STAGES.length - 1 - o); };
+    drawStageScene(STAGES[idxOf(ordi)].key, hy, 1);
+    if (frac > 0.82 && ordi < STAGES.length - 1) {     // 경계에서 다음 나라 크로스페이드
+      const t = (frac - 0.82) / 0.18; drawStageScene(STAGES[idxOf(ordi + 1)].key, hy, t * t * (3 - 2 * t));
+    }
+  }
+  function drawStageScene(key, hy, a) {
+    ctx.save(); ctx.globalAlpha = a;
+    if (key === "moai") bgMoai(hy);
+    else if (key === "liberty") bgCity(hy);
+    else if (key === "clock") bgLondon(hy);
+    else if (key === "eiffel") bgEiffel(hy);
+    else if (key === "windmill") bgWindmill(hy);
+    else if (key === "pisa") bgItaly(hy);
+    else if (key === "pyramid") bgEgypt(hy);
+    else if (key === "taj") bgTaj(hy);
+    else drawSnowMountains(hy);                          // iceberg(남극)·northpole(북극)
+    ctx.restore();
+  }
+  function drawSnowMountains(hy) {
+    for (const b of bergs) {
+      const px = b.x + b.w * b.peak, top = hy - b.h, lx = b.x, rx2 = b.x + b.w;
+      ctx.fillStyle = b.layer ? "rgba(150,190,222,0.92)" : "rgba(206,230,247,0.96)";
+      ctx.beginPath(); ctx.moveTo(lx, hy); ctx.lineTo(px, top); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = b.layer ? "rgba(116,160,198,0.92)" : "rgba(168,204,232,0.96)";
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(rx2, hy); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, hy); ctx.stroke();
+      if (b.cap) {
+        const f = 0.34, yS = top + b.h * f, xl = px + (lx - px) * f, xr = px + (rx2 - px) * f;
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(xr, yS);
+        ctx.lineTo(px + (xr - px) * 0.45, yS - b.h * 0.05); ctx.lineTo(px - (px - xl) * 0.2, yS + b.h * 0.04);
+        ctx.lineTo(px - (px - xl) * 0.6, yS - b.h * 0.02); ctx.lineTo(xl, yS); ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  // 두 톤 건물 블록
+  function bgBldg(x, hy, w, h, lit, shade, win) {
+    ctx.fillStyle = lit; ctx.fillRect(x, hy - h, w, h);
+    ctx.fillStyle = shade; ctx.fillRect(x + w * 0.62, hy - h, w * 0.38, h);
+    if (win) { ctx.fillStyle = "rgba(222,238,255,0.45)"; for (let yy = hy - h + 6; yy < hy - 5; yy += 9) for (let xx = x + 4; xx < x + w - 4; xx += 8) ctx.fillRect(xx, yy, 3, 4); }
+  }
+  // 이스터섬 — 풀 언덕 + 모아이 석상들
+  function bgMoai(hy) {
+    ctx.fillStyle = "rgba(120,170,150,0.9)";
+    ctx.beginPath(); ctx.moveTo(0, hy); for (let x = 0; x <= W; x += 36) ctx.lineTo(x, hy - 9 - Math.sin(x * 0.013) * 7); ctx.lineTo(W, hy); ctx.closePath(); ctx.fill();
+    const pos = [[0.16, 46], [0.4, 62], [0.63, 50], [0.84, 40]];
+    for (const p of pos) {
+      const cx = W * p[0], h = p[1], w = h * 0.52, base = hy - 6;
+      ctx.fillStyle = "rgba(98,106,114,0.96)";
+      ctx.beginPath(); ctx.moveTo(cx - w / 2, base); ctx.lineTo(cx - w / 2, base - h * 0.6);
+      ctx.quadraticCurveTo(cx - w / 2, base - h, cx, base - h); ctx.quadraticCurveTo(cx + w / 2, base - h, cx + w / 2, base - h * 0.6);
+      ctx.lineTo(cx + w / 2, base); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(72,80,88,0.96)"; ctx.fillRect(cx + w * 0.12, base - h * 0.6, w * 0.38, h * 0.6);
+      ctx.fillStyle = "rgba(56,63,71,0.85)"; ctx.fillRect(cx - w * 0.09, base - h * 0.72, w * 0.18, h * 0.5);
+      ctx.fillStyle = "rgba(44,50,58,0.7)"; ctx.fillRect(cx - w * 0.34, base - h * 0.78, w * 0.17, h * 0.07); ctx.fillRect(cx + w * 0.17, base - h * 0.78, w * 0.17, h * 0.07);
+    }
+  }
+  // 미국 — 도시 스카이라인 + 자유의 여신상
+  function bgCity(hy) {
+    const lit = "rgba(120,150,186,0.95)", shade = "rgba(86,116,156,0.95)";
+    const bs = [[0.03, 30, 36], [0.11, 46, 44], [0.19, 64, 52], [0.30, 40, 40], [0.55, 50, 46], [0.66, 72, 56], [0.77, 44, 42], [0.88, 58, 50]];
+    for (const b of bs) bgBldg(W * b[0], hy, b[1], b[2], lit, shade, true);
+    const cx = W * 0.43, base = hy, h = 80, g = "rgba(150,198,178,0.96)";
+    ctx.fillStyle = g; ctx.fillRect(cx - 12, base - h * 0.18, 24, h * 0.18);
+    ctx.beginPath(); ctx.moveTo(cx - 9, base - h * 0.18); ctx.lineTo(cx - 5, base - h * 0.7); ctx.lineTo(cx + 5, base - h * 0.7); ctx.lineTo(cx + 9, base - h * 0.18); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, base - h * 0.74, 5, 0, Math.PI * 2); ctx.fill();
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(cx, base - h * 0.79); ctx.lineTo(cx + i * 3, base - h * 0.87); ctx.lineTo(cx + i * 3 + 1.5, base - h * 0.79); ctx.closePath(); ctx.fill(); }
+    ctx.fillRect(cx + 3, base - h * 0.94, 3, h * 0.24);
+    ctx.fillStyle = "rgba(255,222,140,0.95)"; ctx.beginPath(); ctx.arc(cx + 4.5, base - h * 0.95, 4, 0, Math.PI * 2); ctx.fill();
+  }
+  // 영국 — 빅벤 + 런던아이 + 건물
+  function bgLondon(hy) {
+    const lit = "rgba(150,166,188,0.95)", shade = "rgba(110,126,150,0.95)";
+    const bs = [[0.03, 40, 36], [0.12, 50, 42], [0.74, 48, 42], [0.86, 42, 34]];
+    for (const b of bs) bgBldg(W * b[0], hy, b[1], b[2], lit, shade, true);
+    const bx = W * 0.27, bw = 24, bh = 124;
+    bgBldg(bx, hy, bw, bh, lit, shade, false);
+    ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(bx, hy - bh); ctx.lineTo(bx + bw / 2, hy - bh - 20); ctx.lineTo(bx + bw, hy - bh); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(247,240,212,0.95)"; ctx.beginPath(); ctx.arc(bx + bw / 2, hy - bh + 22, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(60,70,90,0.85)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + bw / 2, hy - bh + 22); ctx.lineTo(bx + bw / 2, hy - bh + 17); ctx.moveTo(bx + bw / 2, hy - bh + 22); ctx.lineTo(bx + bw / 2 + 4, hy - bh + 22); ctx.stroke();
+    const wx = W * 0.62, wy = hy - 56, wr = 46;
+    ctx.fillStyle = shade; ctx.fillRect(wx - 2, wy, 4, hy - wy);
+    ctx.strokeStyle = "rgba(160,188,216,0.9)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1; for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + Math.cos(an) * wr, wy + Math.sin(an) * wr); ctx.stroke(); }
+    ctx.fillStyle = "rgba(205,228,246,0.85)"; for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2; ctx.beginPath(); ctx.arc(wx + Math.cos(an) * wr, wy + Math.sin(an) * wr, 2.5, 0, Math.PI * 2); ctx.fill(); }
+  }
+  // 프랑스 — 에펠탑 + 건물
+  function bgEiffel(hy) {
+    const lit = "rgba(140,160,186,0.95)", shade = "rgba(104,124,154,0.95)";
+    const bs = [[0.05, 52, 32], [0.16, 40, 28], [0.74, 46, 32], [0.85, 54, 36]];
+    for (const b of bs) bgBldg(W * b[0], hy, b[1], b[2], lit, shade, true);
+    const cx = W * 0.45, base = hy, h0 = 138, topW = 4, midW = 15, botW = 48;
+    ctx.fillStyle = "rgba(120,140,168,0.96)";
+    ctx.beginPath(); ctx.moveTo(cx - botW / 2, base);
+    ctx.quadraticCurveTo(cx - midW * 0.6, base - h0 * 0.45, cx - topW / 2, base - h0);
+    ctx.lineTo(cx + topW / 2, base - h0); ctx.quadraticCurveTo(cx + midW * 0.6, base - h0 * 0.45, cx + botW / 2, base);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = shade; ctx.fillRect(cx - botW * 0.5, base - h0 * 0.26, botW, 4); ctx.fillRect(cx - midW * 0.62, base - h0 * 0.52, midW * 1.24, 3);
+    ctx.fillStyle = "rgba(120,140,168,0.96)"; ctx.fillRect(cx - 1.4, base - h0 - 12, 2.8, 12);
+  }
+  // 네덜란드 — 평지 + 풍차 + 튤립
+  function bgWindmill(hy) {
+    ctx.fillStyle = "rgba(132,182,150,0.85)"; ctx.fillRect(0, hy - 8, W, 8);
+    const pos = [[0.22, 56], [0.5, 70], [0.78, 52]];
+    for (const p of pos) {
+      const cx = W * p[0], h = p[1], w = h * 0.34, base = hy - 4;
+      ctx.fillStyle = "rgba(150,166,186,0.96)"; ctx.beginPath(); ctx.moveTo(cx - w / 2, base); ctx.lineTo(cx - w * 0.32, base - h * 0.7); ctx.lineTo(cx + w * 0.32, base - h * 0.7); ctx.lineTo(cx + w / 2, base); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(110,128,152,0.96)"; ctx.fillRect(cx + w * 0.04, base - h * 0.7, w * 0.28, h * 0.7);
+      ctx.fillStyle = "rgba(92,82,92,0.95)"; ctx.beginPath(); ctx.moveTo(cx - w * 0.36, base - h * 0.7); ctx.lineTo(cx, base - h * 0.92); ctx.lineTo(cx + w * 0.36, base - h * 0.7); ctx.closePath(); ctx.fill();
+      const ay = base - h * 0.78, r = h * 0.5;
+      ctx.strokeStyle = "rgba(70,80,96,0.95)"; ctx.lineWidth = 2.4;
+      for (let i = 0; i < 4; i++) { const an = 0.5 + i * Math.PI / 2; ctx.beginPath(); ctx.moveTo(cx, ay); ctx.lineTo(cx + Math.cos(an) * r, ay + Math.sin(an) * r); ctx.stroke(); }
+    }
+    const cols = ["#e8788a", "#e8c349", "#d96a6a", "#c77ad9"];
+    for (let i = 0; i < 26; i++) { const x = 10 + i * (W - 20) / 25; ctx.fillStyle = "rgba(80,150,110,0.9)"; ctx.fillRect(x - 0.5, hy - 6, 1, 5); ctx.fillStyle = cols[i % 4]; ctx.fillRect(x - 1.5, hy - 8, 3, 3); }
+  }
+  // 이탈리아 — 콜로세움 + 피사의 사탑 + 사이프러스
+  function bgItaly(hy) {
+    const lit = "rgba(210,198,170,0.96)", shade = "rgba(172,156,128,0.96)";
+    const ox = W * 0.66, oy = hy - 30, ow = 88, oh = 36;
+    ctx.fillStyle = lit; ctx.beginPath(); ctx.ellipse(ox, oy, ow / 2, oh / 2, 0, Math.PI, 0); ctx.lineTo(ox + ow / 2, hy); ctx.lineTo(ox - ow / 2, hy); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = shade; for (let i = 0; i < 7; i++) { const x = ox - ow / 2 + 7 + i * ((ow - 14) / 6); ctx.fillRect(x, oy - 4, 2.4, oh * 0.5 + 8); }
+    ctx.fillStyle = "rgba(70,112,82,0.9)"; for (const cx2 of [W * 0.05, W * 0.12, W * 0.9]) { ctx.beginPath(); ctx.moveTo(cx2, hy); ctx.lineTo(cx2 - 5, hy - 8); ctx.quadraticCurveTo(cx2, hy - 48, cx2 + 5, hy - 8); ctx.closePath(); ctx.fill(); }
+    const bx = W * 0.32, th = 122, tw = 20;
+    ctx.save(); ctx.translate(bx, hy); ctx.rotate(0.1);
+    ctx.fillStyle = lit; ctx.fillRect(-tw / 2, -th, tw, th); ctx.fillStyle = shade; ctx.fillRect(tw * 0.1, -th, tw * 0.4, th);
+    ctx.strokeStyle = "rgba(150,140,116,0.8)"; ctx.lineWidth = 1; for (let y = -th + 14; y < -6; y += 14) { ctx.beginPath(); ctx.moveTo(-tw / 2, y); ctx.lineTo(tw / 2, y); ctx.stroke(); }
+    ctx.restore();
+  }
+  // 이집트 — 사구 + 피라미드
+  function bgEgypt(hy) {
+    ctx.fillStyle = "rgba(234,202,150,0.88)"; ctx.beginPath(); ctx.moveTo(0, hy); for (let x = 0; x <= W; x += 28) ctx.lineTo(x, hy - 6 - Math.sin(x * 0.02 + 1) * 5); ctx.lineTo(W, hy); ctx.closePath(); ctx.fill();
+    const py = [[0.3, 150, 98], [0.52, 112, 72], [0.72, 92, 58]];
+    for (const p of py) {
+      const cx = W * p[0], w = p[1], h = p[2], base = hy - 2;
+      ctx.fillStyle = "rgba(222,188,134,0.96)"; ctx.beginPath(); ctx.moveTo(cx, base - h); ctx.lineTo(cx - w / 2, base); ctx.lineTo(cx, base); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(186,150,100,0.96)"; ctx.beginPath(); ctx.moveTo(cx, base - h); ctx.lineTo(cx + w / 2, base); ctx.lineTo(cx, base); ctx.closePath(); ctx.fill();
+    }
+  }
+  // 인도 — 타지마할
+  function bgTaj(hy) {
+    const cx = W * 0.5, base = hy - 2, lit = "rgba(240,234,226,0.97)", shade = "rgba(208,198,188,0.97)";
+    function minaret(mx, h) { ctx.fillStyle = lit; ctx.fillRect(mx - 4, base - h, 8, h); ctx.fillStyle = shade; ctx.fillRect(mx + 1, base - h, 3, h); ctx.fillStyle = lit; ctx.beginPath(); ctx.arc(mx, base - h, 6, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(mx, base - h - 3, 3.5, 0, Math.PI * 2); ctx.fill(); }
+    minaret(cx - 88, 74); minaret(cx + 88, 74); minaret(cx - 60, 74); minaret(cx + 60, 74);
+    ctx.fillStyle = lit; ctx.fillRect(cx - 46, base - 56, 92, 56);
+    ctx.fillStyle = shade; ctx.fillRect(cx + 12, base - 56, 34, 56);
+    ctx.fillStyle = lit; for (const sx of [cx - 34, cx + 34]) { ctx.beginPath(); ctx.arc(sx, base - 56, 8, Math.PI, 0); ctx.fill(); }
+    ctx.fillStyle = lit; ctx.beginPath(); ctx.moveTo(cx - 22, base - 56); ctx.bezierCurveTo(cx - 26, base - 86, cx - 10, base - 96, cx, base - 98); ctx.bezierCurveTo(cx + 10, base - 96, cx + 26, base - 86, cx + 22, base - 56); ctx.closePath(); ctx.fill();
+    ctx.fillRect(cx - 1.5, base - 110, 3, 13);
+    ctx.fillStyle = "rgba(110,112,124,0.5)"; ctx.beginPath(); ctx.moveTo(cx - 12, base); ctx.lineTo(cx - 12, base - 30); ctx.arc(cx, base - 30, 12, Math.PI, 0); ctx.lineTo(cx + 12, base); ctx.closePath(); ctx.fill();
+  }
+
   function drawBackground() {
     const sky = ctx.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0.0, "#0a2a4a"); sky.addColorStop(0.28, "#16456e");
@@ -1033,36 +1191,8 @@
     sg.addColorStop(0, "rgba(255,255,255,0.95)"); sg.addColorStop(0.4, "rgba(200,235,255,0.5)"); sg.addColorStop(1, "rgba(200,235,255,0)");
     ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(W * 0.74, hy * 0.6, 60, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 
-    // 설산 — 2겹(뒤→앞), 좌면 밝음/우면 그늘 + 꼭대기 눈모자
-    for (const b of bergs) {
-      const px = b.x + b.w * b.peak, top = hy - b.h;
-      const lx = b.x, rx2 = b.x + b.w;
-      const lit = b.layer ? "rgba(150,190,222,0.92)" : "rgba(206,230,247,0.96)";
-      const shade = b.layer ? "rgba(116,160,198,0.92)" : "rgba(168,204,232,0.96)";
-      // 왼면(밝음) / 오른면(그늘)
-      ctx.fillStyle = lit;
-      ctx.beginPath(); ctx.moveTo(lx, hy); ctx.lineTo(px, top); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = shade;
-      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(rx2, hy); ctx.lineTo(px, hy); ctx.closePath(); ctx.fill();
-      // 능선 하이라이트
-      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, hy); ctx.stroke();
-      // 꼭대기 눈모자 — 봉우리 경사를 따라, 아래는 물결 설선
-      if (b.cap) {
-        const f = 0.34;                              // 눈선 높이(꼭대기에서 비율)
-        const yS = top + b.h * f;
-        const xl = px + (lx - px) * f, xr = px + (rx2 - px) * f;
-        ctx.fillStyle = "rgba(255,255,255,0.95)";
-        ctx.beginPath();
-        ctx.moveTo(px, top);
-        ctx.lineTo(xr, yS);
-        ctx.lineTo(px + (xr - px) * 0.45, yS - b.h * 0.05);
-        ctx.lineTo(px - (px - xl) * 0.2, yS + b.h * 0.04);
-        ctx.lineTo(px - (px - xl) * 0.6, yS - b.h * 0.02);
-        ctx.lineTo(xl, yS);
-        ctx.closePath(); ctx.fill();
-      }
-    }
+    // 나라별 지평선 배경(스테이지 따라 바뀜 + 경계에서 크로스페이드)
+    drawBackdrop(hy);
 
     // 지평선 안개(하늘↔빙원 부드럽게 + 깊이감)
     const fog = ctx.createLinearGradient(0, hy - 26, 0, hy + 30);
