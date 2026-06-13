@@ -1955,9 +1955,6 @@
     if (!o.strata) o.strata = makeStrata();      // 단면 패턴은 생성 시 한 번만 고정
     const G = holeGeom(o, 0.26);
     drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape, o.strata);
-    ctx.save(); ctx.globalAlpha = 0.75; ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "center";
-    ctx.font = "bold " + (9 * G.sc + 6) + "px sans-serif"; ctx.fillText("⬆ 점프", G.cx, G.cy - G.ry - 8 * G.sc);
-    ctx.textAlign = "start"; ctx.restore();
   }
 
   // 거대 협곡 = 좌우로 넓힌 크레바스(판정 구간 중심에 맞춰 그림)
@@ -1965,10 +1962,6 @@
     if (!o.strata) o.strata = makeStrata();      // 단면 패턴은 생성 시 한 번만 고정
     const G = holeGeom(o, 0.15);
     drawIceHole(G.cx, G.cy, G.rx, G.ry, G.sc, o.shape, o.strata);
-    ctx.save(); ctx.globalAlpha = 0.85; ctx.textAlign = "center"; ctx.fillStyle = "#ffd07a";
-    ctx.font = "bold " + (11 * G.sc + 6) + "px sans-serif";
-    ctx.fillText("🪽 날아서 건너기!", G.cx, G.cy - G.ry - 9 * G.sc);
-    ctx.textAlign = "start"; ctx.restore();
   }
 
   // 줍기 표적 마커: 펭귄과 정렬되면 초록으로 빛난다(정확히 먹는지 보이게)
@@ -2038,13 +2031,6 @@
 
     // 그림자
     ctx.fillStyle = "rgba(40,80,120,0.18)"; ctx.beginPath(); ctx.ellipse(x, gy, 11 * sc, 2.8 * sc, 0, 0, Math.PI * 2); ctx.fill();
-
-    // 부드러운 후광
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
-    const aura = ctx.createRadialGradient(x, cy, 1, x, cy, 22 * sc);
-    aura.addColorStop(0, "rgba(170,230,255,0.45)"); aura.addColorStop(1, "rgba(170,230,255,0)");
-    ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(x, cy, 22 * sc, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
 
     ctx.save();
     ctx.translate(x, cy);
