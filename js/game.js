@@ -159,7 +159,7 @@
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
       stun: 0, tumble: 0,
-      falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0,
+      falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0, fallFromX: 0, fallDir: 1,
     };
     holdJump = false;
     items = []; particles = []; texts = []; scenery = []; stored = [];
@@ -343,12 +343,13 @@
     // 크레바스 추락 연출 진행 중엔 일반 진행 정지
     if (player.falling) {
       player.fallT += dt;
-      player.fallVy += 1100 * dt; player.fallY += player.fallVy * dt;
-      player.fallSpin += dt * 7.5;
-      player.flapT += dt * 34;
+      player.fallSpin += dt * player.fallDir * 13;           // 굴러떨어지는 회전
+      if (player.fallT < 0.42) player.fallY += 26 * dt;      // 가장자리에서 가운데로 구르며 살짝 가라앉음
+      else { player.fallVy += 1500 * dt; player.fallY += player.fallVy * dt; }   // 가운데 도달 후 본격 추락
+      player.flapT += dt * 30;
       if (player.fallT > 0.5 && Math.random() < 0.4) spawnParticles(player.holeX, playerLineY(), "#dff0ff", 2, 120);
       updateParticles(dt); updateTexts(dt);
-      if (player.fallT > 1.3) gameOver();
+      if (player.fallT > 1.4) gameOver();
       return;
     }
     elapsed += dt;
@@ -514,8 +515,10 @@
 
   // 크레바스 추락 연출 시작(아케이드식): 펭귄이 구덩이로 빙글빙글 빨려들고 얼음 파편 솟구침
   function startFall(ox) {
-    player.falling = true; player.fallT = 0; player.fallY = 0; player.fallVy = 40; player.fallSpin = 0;
-    player.holeX = ox; player.onGround = false;
+    player.falling = true; player.fallT = 0; player.fallY = 0; player.fallVy = 0; player.fallSpin = 0;
+    player.holeX = ox; player.fallFromX = player.x;            // 빠진 위치 기억 → 가운데(ox)로 굴러감
+    player.fallDir = (ox >= player.x) ? 1 : -1;                // 구르는 방향
+    player.onGround = false;
     screenFlash = 0.55; shake = Math.min(26, shake + 20);
     SND.fall();
     spawnText(ox, playerLineY() - 70, "으악! 빠졌다!", "#ff6b6b", 26);
@@ -1527,9 +1530,6 @@
     // 깨진 얼음 테
     ctx.strokeStyle = "rgba(228,246,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
-    // 서리 알갱이(고정 개수)
-    ctx.fillStyle = "rgba(238,249,255,0.85)";
-    for (let k = 0; k < n; k++) { const a = 0.4 + k * 1.27; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rx * 0.9, cy + Math.sin(a) * ry * 0.9, Math.max(0.8, 1.2 * sc), 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
   }
 
@@ -1721,11 +1721,14 @@
       ctx.beginPath();
       for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI * 2, rr = 1 + (i % 2 ? -0.12 : 0.06); const px = ox + Math.cos(a) * 50 * rr, py = gy + Math.sin(a) * 17 * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
       ctx.closePath(); ctx.stroke();
-      // 그냥 아래로 빠지는 펭귄(살짝 앞으로 기운 채)
+      // 빠진 위치 → 가운데로 굴러떨어지는 펭귄
       ctx.save();
-      const scl = Math.max(0.45, 1 - player.fallY / 220);
-      ctx.translate(ox, gy - 20 + player.fallY);
-      ctx.rotate(0.16);
+      const tx = Math.min(1, player.fallT / 0.42);
+      const ease = tx * tx * (3 - 2 * tx);                    // smoothstep
+      const px = player.fallFromX + (ox - player.fallFromX) * ease;   // 가운데로 이동
+      const scl = Math.max(0.42, 1 - player.fallY / 200);
+      ctx.translate(px, gy - 20 + player.fallY);
+      ctx.rotate(player.fallSpin);                            // 구르는 회전
       ctx.scale(scl, scl);
       drawPenguin(0, 8, 1.6, player.run, false, false, player.flapT, 0, true, 1);
       ctx.restore();
@@ -1882,8 +1885,9 @@
   }
   // ?fall: 추락 연출 한 프레임 미리보기(정지)
   if (location.search.indexOf("fall") >= 0) {
-    startGame(); state = STATE.PLAY; galleryMode = true;
-    startFall(W / 2); player.fallY = 46; player.fallSpin = 2.0; player.fallT = 0.55;
+    startGame(); state = STATE.PLAY;
+    player.x = W / 2 - 85; player.targetX = player.x;   // 가장자리에서 빠짐 → 가운데로 굴러감
+    startFall(W / 2);
   }
   // ?boss: 보스전 즉시 시작(탄약 지급). ?boss=seal 이면 바다표범
   if (location.search.indexOf("boss") >= 0) {
