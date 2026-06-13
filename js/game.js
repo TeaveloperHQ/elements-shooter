@@ -53,6 +53,12 @@
   function projY(p) { return horizonY() + (playerLineY() - horizonY()) * p; }
   function projScale(p) { return 0.28 + 1.0 * p; }
   function halfAt(p) { return roadHalfTop() + (roadHalfBot() - roadHalfTop()) * p; }
+  // 지면 위 물체의 깊이 전진 속도 — 도로 가로줄(scrollY) 스크롤과 정확히 일치시킨다
+  // 가로줄 위상: (scrollY/80)/16, scrollY += speed*dt*0.6  ⇒  du/dt = speed*0.6/1280, dp = pBottom*du
+  function groundDP() {
+    const pB = (H - horizonY()) / (playerLineY() - horizonY());
+    return pB * speed * 0.6 / 1280;
+  }
   // 트랙 "맵": 코스의 좌우 위치를 달린 거리(z)의 함수로 정의 → 설계된 커브가 다가온다
   const LOOKAHEAD = 1500;                 // 지평선이 앞으로 얼마나 멀리 보이는지(월드 단위)
   function trackOffset(z) {
@@ -387,7 +393,7 @@
     if (decorTimer <= 0) { decorTimer = 0.4 + Math.random() * 0.4; spawnScenery(); }
     for (let i = scenery.length - 1; i >= 0; i--) {
       const d = scenery[i];
-      d.p += d.vp * (0.5 + d.p * 1.0) * dt;
+      if (d.vp > 0) d.p += groundDP() * dt;          // 도로 가로줄과 같은 속도
       if (d.p > 1.18) scenery.splice(i, 1);
     }
 
@@ -405,7 +411,7 @@
     const AIR = 16;
     for (let i = items.length - 1; i >= 0; i--) {
       const o = items[i];
-      o.p += o.vp * (0.5 + o.p * 1.0) * dt;
+      if (o.vp > 0) o.p += groundDP() * dt;          // 도로 가로줄과 같은 속도(따로 안 놀게)
 
       // ----- 크레바스: 길이(len)만큼 플레이어 선을 지나가는 동안 계속 판정 -----
       if (o.type === "hole") {
@@ -1224,12 +1230,39 @@
     ctx.beginPath();
     for (let i = 0; i <= n; i++) { const a = (i % n) / n * Math.PI * 2, rr = shp[i % n] * 0.58; const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr + ry * 0.18; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
     ctx.closePath(); ctx.fill();
-    // 세로 빙벽 결
-    ctx.strokeStyle = "rgba(150,200,235,0.34)"; ctx.lineWidth = Math.max(0.8, sc * 0.9); ctx.lineCap = "round";
-    for (let k = 0; k <= cols; k++) { const px = cx + (k / cols - 0.5) * rx * 1.7, len = 0.42 + shp[k % n] * 0.4; ctx.beginPath(); ctx.moveTo(px, cy - ry * 0.5); ctx.lineTo(px, cy + ry * len); ctx.stroke(); }
-    // 위 가장자리 고드름
-    ctx.fillStyle = "rgba(228,246,255,0.88)";
-    for (let k = 0; k <= cols; k++) { const px = cx + (k / cols - 0.5) * rx * 1.5, ty = cy - ry * 0.6, il = (3 + shp[(k + 3) % n] * 4) * sc; ctx.beginPath(); ctx.moveTo(px - 2 * sc, ty); ctx.lineTo(px + 2 * sc, ty); ctx.lineTo(px, ty + il); ctx.closePath(); ctx.fill(); }
+    // 주상절리(세로 기둥) 안쪽 뒷벽 — 얼음이 육각 기둥처럼 갈라진 단면
+    ctx.save();
+    outline(); ctx.clip();                                   // 구멍 안쪽으로만
+    const colN = Math.max(5, Math.round(rx / 13));
+    const topY = cy - ry * 0.92, botY = cy + ry * 0.45;
+    for (let k = 0; k < colN; k++) {
+      const x0 = cx + (k / colN - 0.5) * rx * 2.05;
+      const x1 = cx + ((k + 1) / colN - 0.5) * rx * 2.05;
+      const cw = x1 - x0;
+      const ty = topY + (shp[k % n] - 0.5) * ry * 0.55;      // 기둥별 부러진 윗면
+      // 기둥 면(위는 푸른 얼음, 아래로 갈수록 어둠 속으로)
+      const cg = ctx.createLinearGradient(0, ty, 0, botY);
+      const lit = (k % 2) ? 0.30 : 0.42;                     // 인접 기둥 명암 교차
+      cg.addColorStop(0, "rgba(150,196,228," + lit + ")");
+      cg.addColorStop(0.55, "rgba(60,110,150,0.18)");
+      cg.addColorStop(1, "rgba(10,32,54,0)");
+      ctx.fillStyle = cg; ctx.fillRect(x0, ty, cw + 0.8, botY - ty);
+      // 좌측 밝은 모서리(프리즘 면)
+      ctx.fillStyle = "rgba(206,232,250,0.34)"; ctx.fillRect(x0, ty, Math.max(0.8, cw * 0.16), botY - ty);
+      // 우측 깊은 이음새(기둥 사이 골)
+      ctx.fillStyle = "rgba(5,20,38,0.55)"; ctx.fillRect(x1 - Math.max(0.8, cw * 0.13), ty, Math.max(0.8, cw * 0.13), botY - ty);
+      // 윗면 얇은 하이라이트(기둥 끝)
+      ctx.fillStyle = "rgba(228,246,255,0.7)"; ctx.fillRect(x0 + cw * 0.16, ty, cw * 0.7, Math.max(0.8, sc));
+    }
+    // 가로 절리(기둥을 가로지르는 균열선)
+    ctx.strokeStyle = "rgba(8,26,46,0.32)"; ctx.lineWidth = Math.max(0.8, sc * 0.8);
+    for (let h = 1; h <= 2; h++) {
+      const jy = topY + (botY - topY) * (h / 2.6);
+      ctx.beginPath();
+      for (let k = 0; k <= colN; k++) { const px = cx + (k / colN - 0.5) * rx * 2.05, py = jy + (shp[(k + h) % n] - 0.5) * ry * 0.12; if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+      ctx.stroke();
+    }
+    ctx.restore();
     // 깨진 얼음 테
     ctx.strokeStyle = "rgba(228,246,255,0.92)"; ctx.lineWidth = Math.max(1.5, 2.2 * sc); ctx.lineJoin = "round";
     outline(); ctx.stroke();
