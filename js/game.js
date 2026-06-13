@@ -93,6 +93,7 @@
   let lap = 0;                          // 0:남극→북극(북극곰), 1:북극→남극(바다표범), 2:반복(난이도↑)
   let boss = null, shots = [];          // 보스 객체 / 투사체(캔·눈덩이)
   let bossActive = false, bossTriggeredLap = -1, bossCanTimer = 0;
+  let minaT = 0, minaFwT = 0, minaStage = -1;          // 서울 'mina' 이스터에그(점프 트리거 → 불꽃놀이)
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
   const STAGE_LEN = 6800;
@@ -102,6 +103,7 @@
     { key: "liberty",   name: "미국",      icon: "🗽", tint: "rgba(120,160,210,0.10)" },
     { key: "clock",     name: "영국",      icon: "🎡", tint: "rgba(150,160,175,0.16)" },
     { key: "eiffel",    name: "프랑스",    icon: "🗼", tint: "rgba(210,150,200,0.14)" },
+    { key: "korea",     name: "한국",      icon: "🏯", tint: "rgba(120,180,160,0.12)" },
     { key: "windmill",  name: "네덜란드",  icon: "🌷", tint: "rgba(120,200,170,0.12)" },
     { key: "pisa",      name: "이탈리아",  icon: "🍕", tint: "rgba(255,180,120,0.16)" },
     { key: "pyramid",   name: "이집트",    icon: "🐫", tint: "rgba(255,170,80,0.22)" },
@@ -166,6 +168,7 @@
     score = 0; distance = 0; learned = {}; runCoins = 0;
     spawnTimer = 1.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1; bannerT = 0; supplyStage = -1; supply = [];
     lap = 0; boss = null; shots = []; bossActive = false; bossTriggeredLap = -1; bossCanTimer = 0;
+    minaT = 0; minaFwT = 0; minaStage = -1;
     updateHUD();
   }
 
@@ -422,6 +425,16 @@
       if (ord === lastOrd && inStage > STAGE_LEN * 0.4 && bossTriggeredLap !== lap) {
         startBoss();
       }
+      // 서울 비밀 지점: 한국 스테이지 중반에 💜 마커를 한 번 흘려보냄(점프하면 이스터에그)
+      if (stageLandmark().key === "korea" && minaStage !== lap * 100 + ord && inStage > STAGE_LEN * 0.5) {
+        minaStage = lap * 100 + ord;
+        items.push({ type: "secret", lane: 0, p: 0, vp: 0.10, pulse: 0, done: false });
+      }
+    }
+    // mina 이스터에그 진행 중: 배경 불꽃놀이
+    if (minaT > 0) {
+      minaT -= dt; minaFwT -= dt;
+      if (minaFwT <= 0) { minaFwT = 0.32; firework(); }
     }
     for (let i = supply.length - 1; i >= 0; i--) {
       supply[i].t -= dt;
@@ -452,6 +465,17 @@
     for (let i = items.length - 1; i >= 0; i--) {
       const o = items[i];
       if (o.vp > 0) o.p += groundDP() * dt;          // 도로 가로줄과 같은 속도(따로 안 놀게)
+
+      // ----- 서울 비밀 지점(💜): 그 위에서 점프하면 mina 이스터에그 -----
+      if (o.type === "secret") {
+        o.pulse += dt * 4;
+        if (!o.done && o.p >= 0.95) {
+          const ox = laneToX(1, o.lane);
+          if (player.jumpY > 16 && Math.abs(player.x - ox) < 48) { o.done = true; triggerMina(); items.splice(i, 1); continue; }
+        }
+        if (o.p > 1.12) items.splice(i, 1);
+        continue;
+      }
 
       // ----- 크레바스: 길이(len)만큼 플레이어 선을 지나가는 동안 계속 판정 -----
       if (o.type === "hole") {
@@ -852,6 +876,20 @@
       life: 0.4 + Math.random() * 0.35, max: 0.75, color: color, r: 1.5 + Math.random() * 2,
     });
   }
+  // 서울 'mina' 이스터에그 발동
+  function triggerMina() {
+    minaT = 6.5; minaFwT = 0;
+    spawnText(player.x, playerLineY() - 72, "💜 MINA 💜", "#ff7ad0", 28);
+    showToast("💜 mina 💜 — 롯데월드타워 불꽃놀이!", false);
+    shake = Math.min(12, shake + 6); SND.flag();
+  }
+  function firework() {
+    const fx = 40 + Math.random() * (W - 80), fy = 26 + Math.random() * (horizonY() * 0.72);
+    const cols = ["#ff6bb0", "#ffd34e", "#7ad9ff", "#9cff8f", "#c77ad9", "#ff8f6b"];
+    const col = cols[(Math.random() * cols.length) | 0], nn = 22;
+    for (let i = 0; i < nn; i++) { const a = i / nn * Math.PI * 2, sp = 70 + Math.random() * 70; particles.push({ x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 24, life: 0.85 + Math.random() * 0.5, max: 1.35, color: col, r: 1.6 + Math.random() * 1.6 }); }
+    particles.push({ x: fx, y: fy, vx: 0, vy: 0, life: 0.25, max: 0.4, color: "#ffffff", r: 4 });
+  }
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -1053,6 +1091,7 @@
     else if (key === "pisa") bgItaly(hy);
     else if (key === "pyramid") bgEgypt(hy);
     else if (key === "taj") bgTaj(hy);
+    else if (key === "korea") bgKorea(hy);
     else drawSnowMountains(hy);                          // iceberg(남극)·northpole(북극)
     ctx.restore();
   }
@@ -1189,6 +1228,66 @@
     ctx.fillStyle = lit; ctx.beginPath(); ctx.moveTo(cx - 22, base - 56); ctx.bezierCurveTo(cx - 26, base - 86, cx - 10, base - 96, cx, base - 98); ctx.bezierCurveTo(cx + 10, base - 96, cx + 26, base - 86, cx + 22, base - 56); ctx.closePath(); ctx.fill();
     ctx.fillRect(cx - 1.5, base - 110, 3, 13);
     ctx.fillStyle = "rgba(110,112,124,0.5)"; ctx.beginPath(); ctx.moveTo(cx - 12, base); ctx.lineTo(cx - 12, base - 30); ctx.arc(cx, base - 30, 12, Math.PI, 0); ctx.lineTo(cx + 12, base); ctx.closePath(); ctx.fill();
+  }
+  // 한국 — 뒷산 + N서울타워 + 경복궁(곡선 기와지붕 누각)
+  function bgKorea(hy) {
+    // 뒷산(한국은 산이 많음)
+    ctx.fillStyle = "rgba(120,152,182,0.5)";
+    for (const m of [[0.1, 40], [0.28, 30], [0.86, 48], [0.97, 34]]) { const cx = W * m[0], h = m[1]; ctx.beginPath(); ctx.moveTo(cx - h, hy); ctx.lineTo(cx, hy - h); ctx.lineTo(cx + h, hy); ctx.closePath(); ctx.fill(); }
+    // N서울타워(우측)
+    const tx = W * 0.82, th = 92;
+    ctx.strokeStyle = "rgba(120,140,165,0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(tx, hy); ctx.lineTo(tx, hy - th); ctx.stroke();
+    ctx.fillStyle = "rgba(150,170,195,0.92)"; ctx.fillRect(tx - 5, hy - th - 9, 10, 11);
+    ctx.fillRect(tx - 1.5, hy - th - 28, 3, 19);
+    // 롯데월드타워(좌측, 한국에서 제일 높음 — 위로 좁아지는 곡선 실루엣)
+    const ltx = W * 0.16, lth = 132, lbw = 22;
+    ctx.fillStyle = "rgba(150,172,200,0.92)";
+    ctx.beginPath();
+    ctx.moveTo(ltx - lbw / 2, hy);
+    ctx.quadraticCurveTo(ltx - lbw * 0.28, hy - lth * 0.6, ltx - lbw * 0.14, hy - lth);
+    ctx.lineTo(ltx + lbw * 0.14, hy - lth);
+    ctx.quadraticCurveTo(ltx + lbw * 0.28, hy - lth * 0.6, ltx + lbw / 2, hy);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(120,144,176,0.9)"; ctx.fillRect(ltx + lbw * 0.04, hy - lth, lbw * 0.22, lth);   // 유리 음영
+    ctx.fillStyle = "rgba(150,172,200,0.92)"; ctx.fillRect(ltx - 1, hy - lth - 14, 2, 14);                // 첨탑
+    // 💜 mina 이스터에그: 롯데타워에 세로로 MINA
+    if (minaT > 0) {
+      const g = 0.55 + 0.45 * Math.sin(elapsed * 9);
+      ctx.save(); ctx.textAlign = "center";
+      ctx.shadowColor = "rgba(255,120,200,0.9)"; ctx.shadowBlur = 10 + 6 * g;
+      ctx.fillStyle = "rgba(255," + (120 + 80 * g | 0) + ",210,0.96)";
+      ctx.font = "bold 17px sans-serif";
+      const ml = ["M", "I", "N", "A"];
+      for (let i = 0; i < 4; i++) ctx.fillText(ml[i], ltx, hy - lth + 30 + i * 27);
+      ctx.textAlign = "start"; ctx.restore();
+    }
+    // 경복궁 누각
+    const cx = W * 0.42, base = hy, bw = 124;
+    // 곡선 기와지붕(위로 들린 처마)
+    function roof(yEave, w, h) {
+      ctx.fillStyle = "rgba(58,72,92,0.96)";
+      ctx.beginPath();
+      ctx.moveTo(cx - w / 2, yEave - h * 0.16);
+      ctx.quadraticCurveTo(cx - w * 0.34, yEave - h, cx, yEave - h);
+      ctx.quadraticCurveTo(cx + w * 0.34, yEave - h, cx + w / 2, yEave - h * 0.16);
+      ctx.quadraticCurveTo(cx, yEave + h * 0.14, cx - w / 2, yEave - h * 0.16);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(186,206,228,0.4)"; ctx.lineWidth = 1;   // 용마루
+      ctx.beginPath(); ctx.moveTo(cx - w * 0.32, yEave - h * 0.84); ctx.lineTo(cx + w * 0.32, yEave - h * 0.84); ctx.stroke();
+    }
+    // 석축(돌담) + 홍예문 3
+    ctx.fillStyle = "rgba(182,178,170,0.95)"; ctx.fillRect(cx - bw / 2, base - 30, bw, 30);
+    ctx.fillStyle = "rgba(150,146,140,0.95)"; ctx.fillRect(cx + bw * 0.16, base - 30, bw * 0.34, 30);
+    ctx.fillStyle = "rgba(40,46,54,0.6)";
+    for (const ax of [cx - bw * 0.28, cx, cx + bw * 0.28]) { ctx.beginPath(); ctx.moveTo(ax - 9, base); ctx.lineTo(ax - 9, base - 15); ctx.arc(ax, base - 15, 9, Math.PI, 0); ctx.lineTo(ax + 9, base); ctx.closePath(); ctx.fill(); }
+    // 누각 단청 몸체 + 기둥
+    const pw = bw * 0.84, py = base - 30, ph = 22;
+    ctx.fillStyle = "rgba(150,80,72,0.95)"; ctx.fillRect(cx - pw / 2, py - ph, pw, ph);
+    ctx.fillStyle = "rgba(70,132,120,0.9)"; ctx.fillRect(cx - pw / 2, py - ph, pw, 4);
+    ctx.fillStyle = "rgba(108,54,50,0.95)"; for (let i = 0; i < 6; i++) { const x = cx - pw / 2 + pw * 0.08 + i * pw * 0.168; ctx.fillRect(x - 2, py - ph + 4, 4, ph - 4); }
+    // 2단 곡선 지붕
+    roof(py - ph, bw * 1.08, 26);
+    roof(py - ph - 21, bw * 0.74, 20);
   }
 
   function drawBackground() {
@@ -1637,12 +1736,25 @@
     for (const o of sorted) {
       if (o.type === "hole") continue;             // 구덩이는 drawHoles에서 먼저(아래 레이어)
       if (o.type === "can") drawCan(o);
+      else if (o.type === "secret") drawSecret(o);
       else drawOpener(o);
     }
   }
 
   function drawHole(o) {
     if (o.canyon) drawCanyon(o); else drawCrevasse(o);
+  }
+
+  // 서울 비밀 지점 마커(💜) — 여기서 점프하면 mina 이스터에그
+  function drawSecret(o) {
+    const x = laneToX(o.p, o.lane), y = projY(o.p), sc = projScale(o.p);
+    const pulse = 0.6 + 0.4 * Math.sin(o.pulse || 0);
+    ctx.save();
+    ctx.fillStyle = "rgba(255,140,210,0.35)"; ctx.beginPath(); ctx.ellipse(x, y, 14 * sc * pulse, 4 * sc * pulse, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.6 + 0.4 * pulse; ctx.textAlign = "center";
+    ctx.font = "bold " + (15 * sc) + "px sans-serif"; ctx.fillStyle = "#ff7ad0";
+    ctx.fillText("💜", x, y - 9 * sc - 5 * pulse);
+    ctx.textAlign = "start"; ctx.restore();
   }
 
   // 보통 크레바스 — 매번 다른 랜덤(들쭉날쭉) 외곽선
@@ -2062,6 +2174,13 @@
     stored = [];
     for (let i = 0; i < 6; i++) { const e = BUFF_ELEMENTS[i % BUFF_ELEMENTS.length]; stored.push({ symbol: e.symbol, name: e.name, color: e.color }); }
     startBoss();
+  }
+  // ?mina: 서울 이스터에그(롯데타워 MINA + 불꽃놀이) 미리보기
+  if (location.search.indexOf("mina") >= 0) {
+    startGame(); state = STATE.PLAY;
+    const ki = STAGES.findIndex(function (s) { return s.key === "korea"; });
+    distance = ki * STAGE_LEN + STAGE_LEN * 0.5;
+    minaT = 6.5;
   }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
