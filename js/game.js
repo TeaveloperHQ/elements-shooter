@@ -89,6 +89,10 @@
   let bannerT = 0, bannerText = "", bannerStage = 0;   // 스테이지 도착 배너
   let supplyStage = -1, supply = [];                    // 협곡 전 보급
   let stored = [];          // 상단에 모은 정어리 통조림
+  // ----- 보스(랩) -----
+  let lap = 0;                          // 0:남극→북극(북극곰), 1:북극→남극(바다표범), 2:반복(난이도↑)
+  let boss = null, shots = [];          // 보스 객체 / 투사체(캔·눈덩이)
+  let bossActive = false, bossTriggeredLap = -1, bossCanTimer = 0;
 
   // 남극 → 북극 세계 일주: 스테이지마다 나라별 명물(얼음조각)
   const STAGE_LEN = 6800;
@@ -104,8 +108,14 @@
     { key: "taj",       name: "인도",      icon: "🕌", tint: "rgba(255,150,110,0.20)" },
     { key: "northpole", name: "북극",      icon: "❄️", tint: "rgba(150,210,255,0.16)" },
   ];
-  function stageIndex() { return Math.min(STAGES.length - 1, Math.max(0, Math.floor((distance || 0) / STAGE_LEN))); }
+  const LAP_LEN = STAGES.length * STAGE_LEN;            // 한 바퀴(남극~북극) 길이
+  function lapDist() { return (distance || 0) - lap * LAP_LEN; }            // 이번 랩에서 달린 거리
+  function stageOrdinal() { return Math.min(STAGES.length - 1, Math.max(0, Math.floor(lapDist() / STAGE_LEN))); }
+  // 진행 순서(ordinal)와 실제 나라(index): 짝수 랩은 남극→북극, 홀수 랩은 북극→남극으로 뒤집힘
+  function stageIndex() { const o = stageOrdinal(); return (lap % 2 === 0) ? o : (STAGES.length - 1 - o); }
   function stageLandmark() { return STAGES[stageIndex()]; }
+  function bossKind() { return (lap % 2 === 0) ? "bear" : "seal"; }
+  function bossName() { return bossKind() === "bear" ? "북극곰" : "바다표범"; }
   let snow = [], bergs = [], scenery = [], stars = [], iceFx = [];
   let galleryMode = false;
 
@@ -155,14 +165,16 @@
     items = []; particles = []; texts = []; scenery = []; stored = [];
     score = 0; distance = 0; learned = {}; runCoins = 0;
     spawnTimer = 1.8; elapsed = 0; speed = 150; scrollY = 0; shake = 0; screenFlash = 0; curveT = 0; decorTimer = 0.3; lastStage = 0; lastCanyonStage = -1; bannerT = 0; supplyStage = -1; supply = [];
+    lap = 0; boss = null; shots = []; bossActive = false; bossTriggeredLap = -1; bossCanTimer = 0;
     updateHUD();
   }
 
   // ===================== 입력 =====================
   let keyLeft = false, keyRight = false, holdJump = false, hungryToast = 0;
   function pointerMove(clientX) { const r = canvas.getBoundingClientRect(); player.targetX = clientX - r.left; }
-  function press() {   // 점프(에너지 있어야 가능)
+  function press() {   // 점프(에너지 있어야 가능) / 보스전에선 캔 던지기
     if (state !== STATE.PLAY) return;
+    if (bossActive) { throwCan(); return; }
     if (player.onGround) {
       if (player.energy >= HOP_COST) {
         player.vz = player.jumpV; player.onGround = false; player.energy -= HOP_COST; SND.jump();
@@ -321,7 +333,7 @@
     }
     elapsed += dt;
     speed = 150 + elapsed * 3.2;                  // 점점 빨라짐
-    distance += speed * dt;
+    if (!bossActive) distance += speed * dt;      // 보스전 중엔 스테이지 진행 정지(도로는 계속 흐름)
     scrollY = (scrollY + speed * dt * 0.6) % 80;
     if (shake > 0) shake = Math.max(0, shake - dt * 28);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
@@ -357,35 +369,42 @@
       if (player.jumpY <= 0) { player.jumpY = 0; player.vz = 0; player.onGround = true; }
     }
 
-    // 스폰(속도에 비례해 잦아짐)
-    spawnTimer -= dt;
-    if (spawnTimer <= 0) { spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012); spawnObstacle(); }
+    if (bossActive) {
+      updateBoss(dt);
+    } else {
+      // 스폰(속도에 비례해 잦아짐)
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) { spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012); spawnObstacle(); }
 
-    // 스테이지 전환 알림
-    const st = Math.floor(distance / STAGE_LEN);
-    if (st !== lastStage) {
-      lastStage = st;
-      if (st < STAGES.length) {
-        const s = STAGES[st];
-        bannerT = 2.5; bannerStage = st + 1; bannerText = s.icon + " " + s.name;
+      // 스테이지 전환 알림(랩/방향 인식)
+      const ord = stageOrdinal();
+      if (ord !== lastStage) {
+        lastStage = ord;
+        const s = stageLandmark();
+        bannerT = 2.5; bannerStage = ord + 1; bannerText = s.icon + " " + s.name;
         SND.base();
       }
-    }
-    const inStage = distance - st * STAGE_LEN;
-    // 협곡 직전 보급: 통조림 2 + 따개 2를 순서대로 흘려보내 연료 모을 기회 보장
-    if (supplyStage !== st && inStage > STAGE_LEN * 0.6) {
-      supplyStage = st;
-      supply.push({ t: 0.0, kind: "can" }, { t: 1.0, kind: "can" },
-                   { t: 2.6, kind: "opener" }, { t: 3.9, kind: "opener" });
+      const inStage = lapDist() - ord * STAGE_LEN;
+      const lastOrd = STAGES.length - 1;
+      // 협곡 직전 보급(마지막 스테이지 제외)
+      if (ord < lastOrd && supplyStage !== ord && inStage > STAGE_LEN * 0.6) {
+        supplyStage = ord;
+        supply.push({ t: 0.0, kind: "can" }, { t: 1.0, kind: "can" },
+                     { t: 2.6, kind: "opener" }, { t: 3.9, kind: "opener" });
+      }
+      // 거대 협곡(마지막 스테이지 제외 — 거기선 보스가 기다림)
+      if (ord < lastOrd && lastCanyonStage !== ord && inStage > STAGE_LEN * 0.9 && player.energy >= 40) {
+        lastCanyonStage = ord;
+        spawnCanyon();
+      }
+      // 보스 등장: 마지막 스테이지 중반
+      if (ord === lastOrd && inStage > STAGE_LEN * 0.4 && bossTriggeredLap !== lap) {
+        startBoss();
+      }
     }
     for (let i = supply.length - 1; i >= 0; i--) {
       supply[i].t -= dt;
       if (supply[i].t <= 0) { spawnSupply(supply[i].kind); supply.splice(i, 1); }
-    }
-    // 거대 협곡: 끝자락 + 에너지가 충분할 때만(못 건너는 협곡은 안 나옴)
-    if (lastCanyonStage !== st && inStage > STAGE_LEN * 0.9 && player.energy >= 40) {
-      lastCanyonStage = st;
-      spawnCanyon();
     }
 
     // 길가 풍경 스폰/이동
@@ -554,6 +573,220 @@
     if (player.lives <= 0) gameOver();
   }
 
+  // ===================== 보스전(랩 끝 — 추격전) =====================
+  function playerLane() { return (player.x - curveCenterX(1)) / halfAt(1); }   // 펭귄 현재 레인(-1~1)
+
+  function startBoss() {
+    bossActive = true; bossTriggeredLap = lap;
+    items = items.filter(function (o) { return o.type !== "hole"; });          // 남은 크레바스 제거
+    supply = [];
+    const hp = 8 + lap * 3;                                                     // 랩마다 강해짐
+    boss = { kind: bossKind(), hp: hp, maxHp: hp, lane: 0, p: 0.46, bob: 0, atkT: 1.6, hitFlash: 0, intro: 1.4, win: 0 };
+    bossCanTimer = 0;
+    bannerT = 2.6; bannerStage = 0; bannerText = "⚔ " + bossName() + " 등장!";
+    showToast("🥫 모아둔 통조림을 던져 " + bossName() + "을(를) 쓰러뜨리세요! (탭=던지기)", true);
+    SND.fall();
+  }
+
+  function throwCan() {
+    if (!boss || boss.win > 0) return;
+    if (!stored.length) {
+      spawnText(player.x, playerLineY() - 56, "통조림이 없어요! 🥫", "#ffcf9a", 16);
+      SND.bad(); return;
+    }
+    const c = stored.pop();
+    shots.push({ kind: "can", lane: playerLane(), p: 0.98, sym: c.symbol, color: c.color, spin: 0 });
+    spawnParticles(player.x, playerLineY() - 26, "#ffe08a", 6, 140);
+    SND.jump(); updateHUD();
+  }
+
+  function updateBoss(dt) {
+    if (!boss) return;
+    boss.bob += dt;
+    if (boss.hitFlash > 0) boss.hitFlash -= dt;
+    if (boss.intro > 0) boss.intro -= dt;
+
+    if (boss.win > 0) {                          // 승리 연출(멀어지며 쓰러짐)
+      boss.win -= dt; boss.p += dt * 0.25;
+      updateShots(dt);
+      if (boss.win <= 0) finishBoss();
+      return;
+    }
+
+    // 좌우로 휘청이며 도망(추격전)
+    boss.lane = Math.sin(boss.bob * (0.9 + lap * 0.06)) * (0.72 + lap * 0.04);
+    boss.p = 0.44 + Math.sin(boss.bob * 0.7) * 0.05;
+
+    // 탄약 보충: 다 떨어져도 잡을 수 있게 통조림을 가끔 흘려보냄
+    bossCanTimer -= dt;
+    if (bossCanTimer <= 0) {
+      bossCanTimer = 2.4;
+      if (stored.length < 6) {
+        const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+        items.push({ type: "can", el: el, lane: -0.7 + Math.random() * 1.4, p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
+      }
+    }
+
+    // 보스 공격: 눈덩이를 펭귄 쪽으로(소개 연출 후)
+    if (boss.intro <= 0) {
+      boss.atkT -= dt;
+      if (boss.atkT <= 0) {
+        boss.atkT = Math.max(0.65, 1.7 - lap * 0.18);
+        shots.push({ kind: "snow", lane: boss.lane, p: boss.p, aim: playerLane() + (Math.random() - 0.5) * 0.5, vp: 0.85 + lap * 0.08 });
+        SND.bad();
+      }
+    }
+
+    updateShots(dt);
+
+    if (boss.hp <= 0) {
+      boss.win = 1.6;
+      spawnParticles(laneToX(boss.p, boss.lane), projY(boss.p), "#ffffff", 26, 260);
+      spawnText(W / 2, H * 0.4, "🏆 " + bossName() + " 격파!", "#ffe678", 30);
+      shake = Math.min(20, shake + 14); SND.base();
+    }
+  }
+
+  function updateShots(dt) {
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const s = shots[i];
+      if (s.kind === "can") {                    // 펭귄 → 보스(깊이 감소)
+        s.p -= 1.15 * dt; s.spin += dt * 16;
+        if (boss && boss.win <= 0 && s.p <= boss.p) {
+          const sx = laneToX(boss.p, s.lane), bx = laneToX(boss.p, boss.lane);
+          if (Math.abs(sx - bx) < 34 * projScale(boss.p)) {
+            boss.hp = Math.max(0, boss.hp - 1); boss.hitFlash = 0.18;
+            spawnParticles(bx, projY(boss.p), "#bcd6e8", 10, 180);
+            spawnText(bx, projY(boss.p) - 24, "−1", "#ff8a8a", 18);
+            SND.flag();
+          }
+          shots.splice(i, 1); continue;
+        }
+        if (s.p < 0.18) shots.splice(i, 1);
+        continue;
+      }
+      // 눈덩이: 보스 → 펭귄(깊이 증가, 펭귄 쪽으로 약간 조준)
+      s.p += s.vp * dt;
+      s.lane += (s.aim - s.lane) * Math.min(1, dt * 2.2);
+      if (s.p >= 0.98) {
+        const sx = laneToX(1, s.lane);
+        if (Math.abs(player.x - sx) < 26 && player.jumpY < 30) loseLife(bossName() + "의 공격에 맞았다!");
+        else spawnParticles(sx, playerLineY() + 6, "#e8f4ff", 8, 150);
+        shots.splice(i, 1);
+      }
+    }
+  }
+
+  function finishBoss() {
+    lap++;                                        // 다음 랩(방향 반전·난이도↑)
+    distance = lap * LAP_LEN + 60;
+    bossActive = false; boss = null; shots = [];
+    lastStage = -1; supplyStage = -1; lastCanyonStage = -1; bossTriggeredLap = -1;
+    spawnTimer = 1.2; bossCanTimer = 0;
+    items = items.filter(function (o) { return o.type !== "hole"; });
+    score += 600 * lap; runCoins += 8 * lap;
+    bannerT = 2.8; bannerStage = 0;
+    bannerText = (lap % 2 === 1) ? "🧭 북극 → 남극 (난이도 ↑)" : "🧭 남극 → 북극 (난이도 ↑)";
+    showToast("다음 보스: " + bossName() + "! 방향이 바뀌고 더 강해집니다.", true);
+    updateHUD();
+  }
+
+  // ----- 보스/투사체 렌더 -----
+  function drawBoss() {
+    if (!boss) return;
+    const x = laneToX(boss.p, boss.lane), y = projY(boss.p), s = projScale(boss.p) * 2.2;
+    ctx.save();
+    ctx.translate(x, y);
+    if (boss.win > 0) { const f = 1 - boss.win / 1.6; ctx.rotate(f * 0.5); ctx.globalAlpha = Math.max(0, 1 - f); }
+    if (boss.kind === "bear") drawBear(s, boss.bob, boss.hitFlash > 0);
+    else drawSeal(s, boss.bob, boss.hitFlash > 0);
+    ctx.restore();
+  }
+
+  function drawBear(s, t, hurt) {
+    const body = hurt ? "#ffd6d6" : "#f4f9ff", shade = hurt ? "#e6a8a8" : "#d4e4f2";
+    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 6) * 1.6);
+    ctx.fillStyle = "rgba(40,80,120,0.22)"; ctx.beginPath(); ctx.ellipse(0, 27, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shade;
+    ctx.beginPath(); ctx.ellipse(-10, 21, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(10, 21, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = body; ctx.strokeStyle = shade; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.ellipse(0, 5, 20, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = shade;                        // 팔(던지는 자세)
+    ctx.beginPath(); ctx.ellipse(-19, -6, 6, 10, 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(19, -11, 6, 10, -0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = body; ctx.strokeStyle = shade;
+    ctx.beginPath(); ctx.arc(0, -20, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-11, -31, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(11, -31, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#eaf2fb"; ctx.beginPath(); ctx.ellipse(0, -14, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1a2330";
+    ctx.beginPath(); ctx.ellipse(0, -16, 2.6, 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-6, -23, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -23, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSeal(s, t, hurt) {
+    const body = hurt ? "#ffd6d6" : "#9fb3c4", shade = hurt ? "#e6a8a8" : "#7c93a8";
+    ctx.save(); ctx.scale(s, s); ctx.translate(0, Math.sin(t * 5) * 1.4);
+    ctx.fillStyle = "rgba(40,80,120,0.22)"; ctx.beginPath(); ctx.ellipse(0, 27, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = body; ctx.strokeStyle = shade; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.ellipse(0, 6, 19, 23, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 몸통
+    ctx.fillStyle = shade;                        // 지느러미
+    ctx.beginPath(); ctx.ellipse(-17, 4, 6, 11, 0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(17, 4, 6, 11, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-7, 26, 7, 4, 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(7, 26, 7, 4, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = body; ctx.strokeStyle = shade; // 머리
+    ctx.beginPath(); ctx.arc(0, -18, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#eaf2fb"; ctx.beginPath(); ctx.ellipse(0, -13, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1a2330";
+    ctx.beginPath(); ctx.ellipse(0, -15, 2.6, 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-6, -21, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -21, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(20,30,45,0.4)"; ctx.lineWidth = 0.6;   // 수염
+    ctx.beginPath(); ctx.moveTo(-3, -12); ctx.lineTo(-12, -11); ctx.moveTo(-3, -11); ctx.lineTo(-12, -9);
+    ctx.moveTo(3, -12); ctx.lineTo(12, -11); ctx.moveTo(3, -11); ctx.lineTo(12, -9); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawShots() {
+    for (const s of shots) {
+      const x = laneToX(s.p, s.lane), y = projY(s.p), sc = projScale(s.p);
+      if (s.kind === "can") {
+        ctx.save(); ctx.translate(x, y - 8 * sc); ctx.rotate(s.spin); ctx.scale(sc, sc);
+        ctx.fillStyle = "#cfd8e0"; ctx.strokeStyle = "#8a98a4"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.rect(-7, -9, 14, 18); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#e7eef5"; ctx.fillRect(-7, -3, 14, 6);
+        ctx.fillStyle = s.color || "#69c"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(s.sym || "", 0, 2); ctx.textAlign = "start";
+        ctx.restore();
+      } else {
+        ctx.save(); ctx.translate(x, y - 10 * sc);
+        ctx.fillStyle = "rgba(180,210,235,0.45)"; ctx.beginPath(); ctx.arc(0, 0, 9 * sc, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#f2f9ff"; ctx.strokeStyle = "#bcd6e8"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(0, 0, 6.5 * sc, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawBossHP() {
+    if (!boss) return;
+    const bw = W * 0.62, bx = W / 2 - bw / 2, by = 92, bh = 14;
+    ctx.save();
+    ctx.fillStyle = "rgba(10,24,40,0.6)"; ctx.fillRect(bx - 6, by - 22, bw + 12, bh + 28);
+    ctx.textAlign = "center"; ctx.fillStyle = "#ffdada"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText((boss.kind === "bear" ? "🐻‍❄ " : "🦭 ") + bossName(), W / 2, by - 7);
+    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(bx, by, bw, bh);
+    const frac = Math.max(0, boss.hp / boss.maxHp);
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, "#ff6b6b"); g.addColorStop(1, "#ffa86b");
+    ctx.fillStyle = g; ctx.fillRect(bx, by, bw * frac, bh);
+    ctx.strokeStyle = "rgba(255,210,210,0.85)"; ctx.lineWidth = 1.5; ctx.strokeRect(bx, by, bw, bh);
+    ctx.textAlign = "start"; ctx.restore();
+  }
+
   // ===================== 파티클 / 텍스트 / 눈 =====================
   function spawnParticles(x, y, color, n, spd) {
     spd = spd || 160;
@@ -628,6 +861,7 @@
     if (state === STATE.PLAY || state === STATE.OVER) {
       drawScenery();
       drawItems();
+      if (bossActive) { drawBoss(); drawShots(); }
       drawParticles();
       drawPlayer();
       drawTexts();
@@ -640,6 +874,7 @@
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
     if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawEnergyGauge(); drawStageBanner(); }
+    if (bossActive && state === STATE.PLAY) drawBossHP();
   }
 
   // 스테이지 도착 배너(슬라이드 인 → 유지 → 페이드 아웃)
@@ -661,10 +896,12 @@
     ctx.beginPath(); ctx.moveTo(bx + bw * 0.1, cy - bh / 2); ctx.lineTo(bx + bw * 0.9, cy - bh / 2);
     ctx.moveTo(bx + bw * 0.1, cy + bh / 2); ctx.lineTo(bx + bw * 0.9, cy + bh / 2); ctx.stroke();
     ctx.textAlign = "center";
-    ctx.fillStyle = "#ffe08a"; ctx.font = "bold 13px sans-serif";
-    ctx.fillText("STAGE " + bannerStage, W / 2, cy - 9);
+    if (bannerStage > 0) {
+      ctx.fillStyle = "#ffe08a"; ctx.font = "bold 13px sans-serif";
+      ctx.fillText("STAGE " + bannerStage, W / 2, cy - 9);
+    }
     ctx.fillStyle = "#ffffff"; ctx.font = "bold 23px sans-serif";
-    ctx.fillText(bannerText, W / 2, cy + 17);
+    ctx.fillText(bannerText, W / 2, cy + (bannerStage > 0 ? 17 : 8));
     ctx.textAlign = "start";
     ctx.restore();
   }
@@ -697,23 +934,28 @@
   function drawNav() {
     const yL = 56, x0 = 28, x1 = W - 28, w = x1 - x0;
     const n = STAGES.length;
-    const prog = Math.max(0, Math.min(1, distance / (STAGE_LEN * (n - 1))));
+    // 지도는 항상 남극(좌)→북극(우) 고정. 마커는 '현재 나라'(방향 반전 시 우→좌로 이동)
+    const ordF = Math.max(0, Math.min(n - 1, lapDist() / STAGE_LEN));
+    const geo = (lap % 2 === 0) ? ordF : (n - 1 - ordF);
+    const prog = geo / (n - 1);
+    const fwd = (lap % 2 === 0);
 
     // 패널
     ctx.fillStyle = "rgba(10,24,40,0.5)";
     ctx.fillRect(x0 - 16, yL - 20, w + 32, 38);
 
-    // 전체 경로(점선) + 진행 경로
+    // 전체 경로(점선) + 진행 경로(출발지 쪽에서 마커까지)
     ctx.strokeStyle = "rgba(175,210,238,0.45)"; ctx.lineWidth = 3; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.moveTo(x0, yL); ctx.lineTo(x1, yL); ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = "#6fd3ff"; ctx.lineWidth = 3; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x0, yL); ctx.lineTo(x0 + w * prog, yL); ctx.stroke();
+    const mx = x0 + w * prog;
+    ctx.beginPath(); ctx.moveTo(fwd ? x0 : x1, yL); ctx.lineTo(mx, yL); ctx.stroke();
 
     // 스테이지 노드 + 아이콘
     ctx.textAlign = "center";
     for (let i = 0; i < n; i++) {
       const nx = x0 + w * (i / (n - 1));
-      const reached = distance >= STAGE_LEN * i;
+      const reached = fwd ? (geo >= i - 0.001) : (geo <= i + 0.001);
       ctx.fillStyle = reached ? "#6fd3ff" : "rgba(200,220,240,0.45)";
       ctx.beginPath(); ctx.arc(nx, yL, (i === 0 || i === n - 1) ? 4.5 : 3.2, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = reached ? 1 : 0.5;
@@ -722,7 +964,6 @@
     }
 
     // 현재 위치 마커(펭귄)
-    const mx = x0 + w * prog;
     ctx.fillStyle = "#ffe678"; ctx.beginPath(); ctx.arc(mx, yL, 6, 0, Math.PI * 2); ctx.fill();
     ctx.font = "10px sans-serif"; ctx.fillStyle = "#1b2733"; ctx.fillText("🐧", mx, yL + 3.5);
 
@@ -1621,6 +1862,15 @@
   if (location.search.indexOf("fall") >= 0) {
     startGame(); state = STATE.PLAY; galleryMode = true;
     startFall(W / 2); player.fallY = 46; player.fallSpin = 2.0; player.fallT = 0.55;
+  }
+  // ?boss: 보스전 즉시 시작(탄약 지급). ?boss=seal 이면 바다표범
+  if (location.search.indexOf("boss") >= 0) {
+    startGame(); state = STATE.PLAY;
+    if (location.search.indexOf("seal") >= 0) lap = 1;
+    distance = lap * LAP_LEN + (STAGES.length - 1) * STAGE_LEN + STAGE_LEN * 0.5;
+    stored = [];
+    for (let i = 0; i < 6; i++) { const e = BUFF_ELEMENTS[i % BUFF_ELEMENTS.length]; stored.push({ symbol: e.symbol, name: e.name, color: e.color }); }
+    startBoss();
   }
   // ?gallery: 아이템 스프라이트를 정적으로 배치해 한 프레임에 모두 확인
   if (location.search.indexOf("gallery") >= 0) {
