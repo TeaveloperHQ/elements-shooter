@@ -419,7 +419,9 @@
                      { t: 2.6, kind: "opener" }, { t: 3.9, kind: "opener" });
       }
       // 거대 협곡(마지막 스테이지 제외 — 거기선 보스가 기다림)
-      if (ord < lastOrd && lastCanyonStage !== ord && inStage > STAGE_LEN * 0.9 && player.energy >= 40) {
+      // 기준: 펭귄 에너지가 아니라 '도로가 보급(통조림·따개)을 뿌렸는가'.
+      // → 가장자리에 숨어 안 먹어도 협곡은 나온다(회피 악용 방지)
+      if (ord < lastOrd && lastCanyonStage !== ord && inStage > STAGE_LEN * 0.9 && supplyStage === ord) {
         lastCanyonStage = ord;
         spawnCanyon();
       }
@@ -2183,12 +2185,18 @@
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
     ctx.beginPath(); ctx.ellipse(0, -8, 12.5, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 통통한 몸
+    // 목/어깨 — 머리 아래를 몸통과 매끄럽게 연결(단차 제거)
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(-8, -19); ctx.quadraticCurveTo(-11.5, -15, -11.5, -9);
+    ctx.lineTo(11.5, -9); ctx.quadraticCurveTo(11.5, -15, 8, -19);
+    ctx.closePath(); ctx.fill();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
-    // 날개(날 땐 크게 펄럭)
+    // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(뿌리가 몸통에 묻힘)
     ctx.fillStyle = "#0e1a24";
-    ctx.save(); ctx.translate(-10.5, -9); ctx.rotate(flap); ctx.beginPath(); ctx.ellipse(-wingLen * 0.4, 0, 3.5, wingLen, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(10.5, -9); ctx.rotate(-flap); ctx.beginPath(); ctx.ellipse(wingLen * 0.4, 0, 3.5, wingLen, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(-9.5, -12); ctx.rotate(0.2 + flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(9.5, -12); ctx.rotate(-0.2 - flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     // 날 때 반짝이는 활공 효과
     if (fly) {
       ctx.fillStyle = "rgba(180,235,255,0.5)";
@@ -2200,10 +2208,12 @@
     ctx.fillStyle = "#c92f2f"; ctx.beginPath();
     ctx.moveTo(6, -14); ctx.lineTo(11.5 + flap * 4, -9 + flap * 7); ctx.lineTo(8, -12.5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.7, 0, Math.PI * 2); ctx.fill();
-    // 뒤통수(둥글게) + 하이라이트
-    ctx.fillStyle = "#1b2733"; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.arc(0, -20.5, 8.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22.5, 3.2, 0, Math.PI * 2); ctx.fill();
+    // 뒤통수(둥글게) — 윗부분만 외곽선(아래는 몸통과 자연스럽게 이어짐)
+    ctx.fillStyle = "#1b2733";
+    ctx.beginPath(); ctx.arc(0, -20, 8.4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(0, -20, 8.4, Math.PI * 1.04, Math.PI * 1.96, false); ctx.stroke();   // 위쪽 호만
+    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22, 3.2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
