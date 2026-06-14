@@ -2282,7 +2282,11 @@
     ctx.beginPath(); ctx.ellipse(0, -6, 13, 13.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
-    // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
+    // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(배낭보다 뒤 레이어)
+    ctx.fillStyle = "#0e1a24";
+    ctx.save(); ctx.translate(-9.5, -12); ctx.rotate(0.2 + flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(9.5, -12); ctx.rotate(-0.2 - flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    // 빨간 배낭(등) — 날개보다 앞 레이어. 캔이 늘수록 홀쭉 → 뚱뚱
     {
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
       const pf = Math.min(1, pn / 26);                 // 더 천천히 빵빵해짐
@@ -2298,10 +2302,6 @@
       ctx.fillStyle = "#b62f24"; ctx.beginPath(); ctx.ellipse(0, topY + ry * 0.34, rx * 0.96, ry * 0.34, 0, 0, Math.PI * 2); ctx.fill();   // 윗뚜껑
       ctx.fillStyle = "#d8dde2"; ctx.fillRect(-1.6, cyp - 1, 3.2, 2.2);          // 은색 버클
     }
-    // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(뿌리가 몸통에 묻힘)
-    ctx.fillStyle = "#0e1a24";
-    ctx.save(); ctx.translate(-9.5, -12); ctx.rotate(0.2 + flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(9.5, -12); ctx.rotate(-0.2 - flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     // 날 때 반짝이는 활공 효과
     if (fly) {
       ctx.fillStyle = "rgba(180,235,255,0.5)";
