@@ -2275,17 +2275,16 @@
     ctx.moveTo(-4, 2); ctx.lineTo(-1.3, 10.5); ctx.lineTo(-0.3, 3);
     ctx.lineTo(0.3, 3); ctx.lineTo(1.3, 10.5); ctx.lineTo(4, 2);
     ctx.closePath(); ctx.fill();
-    // 머리+몸통 한 덩어리(자연스러운 연결) — 가운데가 살짝 잘록한 박 모양
-    const bg = ctx.createLinearGradient(-9, -30, 9, 6);
+    // 머리+몸통 — 전체가 매끄러운 계란 모양(아이콘과 결 맞춤)
+    const bg = ctx.createLinearGradient(-9, -30, 9, 7);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
     ctx.beginPath();
     ctx.moveTo(0, -29);
-    ctx.bezierCurveTo(8.6, -29, 9, -21, 8, -14.5);     // 머리 우측 → 목
-    ctx.bezierCurveTo(11.6, -13, 13, -2, 11, 3.5);     // 몸통 우측
-    ctx.bezierCurveTo(8, 8.5, -8, 8.5, -11, 3.5);      // 아래 둥글게
-    ctx.bezierCurveTo(-13, -2, -11.6, -13, -8, -14.5); // 몸통 좌측 → 목
-    ctx.bezierCurveTo(-9, -21, -8.6, -29, 0, -29);     // 머리 좌측 → 정수리
+    ctx.bezierCurveTo(9, -29, 12.6, -16, 12.6, -2);    // 위(머리) 좁고 → 가장 넓은 곳
+    ctx.bezierCurveTo(12.6, 5, 8, 7.5, 0, 7.5);        // 아래 둥글게
+    ctx.bezierCurveTo(-8, 7.5, -12.6, 5, -12.6, -2);
+    ctx.bezierCurveTo(-12.6, -16, -9, -29, 0, -29);
     ctx.closePath(); ctx.fill(); ctx.stroke();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
@@ -2311,12 +2310,6 @@
       ctx.fillStyle = "rgba(180,235,255,0.5)";
       ctx.beginPath(); ctx.arc(0, 8, 5, 0, Math.PI * 2); ctx.fill();
     }
-    // 빨간 목도리 + 매듭 + 펄럭이는 자락
-    ctx.fillStyle = "#e23b3b"; ctx.strokeStyle = "#a82626"; ctx.lineWidth = 0.7;
-    ctx.beginPath(); ctx.ellipse(0, -15, 9.2, 2.7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#c92f2f"; ctx.beginPath();
-    ctx.moveTo(6, -14); ctx.lineTo(11.5 + flap * 4, -9 + flap * 7); ctx.lineTo(8, -12.5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.7, 0, Math.PI * 2); ctx.fill();
     // 둥근 뒤통수 하이라이트(머리 입체감)
     ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22, 3.2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
