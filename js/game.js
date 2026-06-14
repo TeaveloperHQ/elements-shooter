@@ -2287,10 +2287,10 @@
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
       const pf = Math.min(1, pn / 26);                 // 더 천천히 빵빵해짐
       const cyp = -4, rx = 3.4 + 6.6 * pf, ry = 7 + 3.2 * pf, topY = cyp - ry;
-      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 2; ctx.lineCap = "round";      // 배낭→양 어깨로 벌어져(><) 어깨만 감쌈
+      ctx.strokeStyle = "#c0392b"; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round";   // >< 직선 어깨끈
       ctx.beginPath();
-      ctx.moveTo(-2.5, cyp - ry * 0.4); ctx.quadraticCurveTo(-8, -12, -11, -8);
-      ctx.moveTo(2.5, cyp - ry * 0.4); ctx.quadraticCurveTo(8, -12, 11, -8);
+      ctx.moveTo(-11, -12); ctx.lineTo(-5, -8); ctx.lineTo(-11, -4);   // 좌 어깨 >
+      ctx.moveTo(11, -12); ctx.lineTo(5, -8); ctx.lineTo(11, -4);      // 우 어깨 <
       ctx.stroke();
       ctx.fillStyle = "#d8392c"; ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1;  // 둥근 주머니(아래가 볼록)
       ctx.beginPath(); ctx.ellipse(0, cyp, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
