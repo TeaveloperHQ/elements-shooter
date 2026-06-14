@@ -160,7 +160,7 @@
       flapT: 0,                            // 날갯짓 위상
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
-      stun: 0, tumble: 0,
+      stun: 0, tumble: 0, dexLifeGiven: false,
       falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0, fallFromX: 0, fallDir: 1, fallHole: null,
     };
     holdJump = false;
@@ -384,7 +384,7 @@
       player.flapT += dt * 30;
       if (player.fallT > 0.5 && Math.random() < 0.4) spawnParticles(player.holeX, playerLineY(), "#dff0ff", 2, 120);
       updateParticles(dt); updateTexts(dt);
-      if (player.fallT > 1.4) gameOver();
+      if (player.fallT > 1.4) { if (player.lives > 1) reviveFromFall(); else gameOver(); }
       return;
     }
     elapsed += dt;
@@ -518,7 +518,7 @@
         const frontP = o.p, backP = o.p - o.len;
         const big = !!o.canyon;
         const overLine = backP <= 1 && frontP >= 1;          // 플레이어 선이 구덩이 위
-        if (overLine && player.onGround) {
+        if (overLine && player.onGround && player.stun <= 0) {   // 무적(부활 직후) 중엔 안 빠짐
           const ox = laneToX(1, o.lane), holeHalf = halfAt(1) * o.w;
           const dist = Math.abs(player.x - ox);
           if (dist < holeHalf + 6) {
@@ -606,6 +606,13 @@
     spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
     SND.flag();
     showToast(el.symbol + " = " + el.name + " 통조림 획득! (위에 모임)", false);
+    // 주기율표(1~25) 완성 → 목숨 +1(추락·피격 시 한 번 부활)
+    if (!player.dexLifeGiven && Object.keys(learned).length >= ELEMENTS.length) {
+      player.dexLifeGiven = true; player.lives++;
+      spawnText(player.x, playerLineY() - 92, "주기율표 완성! 목숨 +1 ❤", "#ffe678", 22);
+      showToast("📖 주기율표 완성! 목숨 +1 — 떨어지거나 맞아도 한 번 부활!", false);
+      shake = Math.min(14, shake + 8); SND.base();
+    }
     updateHUD();
     return true;
   }
@@ -655,6 +662,16 @@
     if (msg) showToast(msg, true);
     updateHUD();
     if (player.lives <= 0) gameOver();
+  }
+  // 추락에서 부활(여분 목숨이 있을 때) — 도로로 다시 튀어나오고 잠깐 무적
+  function reviveFromFall() {
+    player.lives--;
+    player.falling = false; player.onGround = true; player.jumpY = 0; player.vz = 0; player.fallY = 0; player.fallT = 0;
+    player.stun = 1.4;                                   // 잠깐 무적
+    if (player.fallHole) { player.fallHole.cleared = true; player.fallHole.p = 2; }   // 빠진 구덩이는 지나간 것으로
+    screenFlash = 0.35; shake = Math.min(16, shake + 8);
+    spawnText(player.x, playerLineY() - 52, "부활! ❤", "#aef0c0", 22);
+    SND.base(); updateHUD();
   }
 
   // ===================== 보스전(랩 끝 — 추격전) =====================
