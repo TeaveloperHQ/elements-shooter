@@ -31,38 +31,36 @@ canvas#game {
   height: 100%;
 }
 
-/* ---------- 모바일 조작 버튼 ---------- */
+/* ---------- 모바일 조작 버튼(삼각 배치, 한 손) ---------- */
 #touch-controls {
   display: none;
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 130px;
+  inset: 0;
   z-index: 6;
-  padding: 0 18px 20px;
-  justify-content: space-between;
-  align-items: flex-end;
   pointer-events: none;
 }
 body.touch #touch-controls {
-  display: flex;
+  display: block;
 }
-.tc-move {
-  display: flex;
-  gap: 16px;
-  margin-left: 44px;
+.tc-pad {
+  position: absolute;
+  bottom: 20px;
+  width: 138px;
+  height: 104px;
   pointer-events: none;
 }
+#touch-controls.rh .tc-pad { right: 16px; }
+#touch-controls.lh .tc-pad { left: 16px; }
 .tc-btn {
+  position: absolute;
   pointer-events: auto;
-  width: 64px;
-  height: 64px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  border: 2px solid rgba(180, 220, 255, 0.55);
-  background: rgba(18, 46, 76, 0.42);
+  border: 2px solid rgba(180, 220, 255, 0.5);
+  background: rgba(18, 46, 76, 0.4);
   color: #eaf6ff;
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 800;
   line-height: 1;
   backdrop-filter: blur(3px);
@@ -72,14 +70,39 @@ body.touch #touch-controls {
   touch-action: none;
 }
 .tc-btn:active {
-  background: rgba(60, 140, 210, 0.62);
-  transform: scale(0.93);
+  background: rgba(60, 140, 210, 0.6);
+  transform: scale(0.92);
 }
-.tc-jump {
-  width: 84px;
-  height: 84px;
-  font-size: 30px;
-  background: rgba(40, 120, 200, 0.46);
+.tc-up    { top: 0; left: 44px; background: rgba(40, 120, 200, 0.44); }   /* 점프(상단) */
+.tc-l     { bottom: 0; left: 0; }                                        /* 좌(하단 좌) */
+.tc-r     { bottom: 0; right: 0; }                                       /* 우(하단 우) */
+
+/* 손잡이 토글 */
+.hand-row {
+  font-size: 13px;
+  color: #cfe0f0;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.hand-btn {
+  background: rgba(12, 30, 50, 0.6);
+  border: 1px solid rgba(150, 200, 255, 0.4);
+  border-radius: 8px;
+  color: #eaf6ff;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 귀환 메시지 */
+.relay-msg {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #dbe7f4;
 }
 
 /* ---------- HUD ---------- */
@@ -116,7 +139,7 @@ body.touch #touch-controls {
 #toast {
   position: absolute;
   left: 50%;
-  top: 124px;
+  top: 162px;
   transform: translateX(-50%) translateY(-20px);
   background: rgba(10, 16, 28, 0.92);
   border: 1px solid rgba(120, 200, 160, 0.4);

@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="원소 슈터" />
 
-  <link rel="stylesheet" href="css/style.css?v=39" />
+  <link rel="stylesheet" href="css/style.css?v=40" />
 </head>
 <body>
   <div id="game-wrap">
@@ -33,13 +33,13 @@
     <!-- 원소 설명 토스트 -->
     <div id="toast"></div>
 
-    <!-- 모바일 조작 버튼 -->
-    <div id="touch-controls">
-      <div class="tc-move">
-        <button class="tc-btn" id="btn-left" aria-label="왼쪽">◀</button>
-        <button class="tc-btn" id="btn-right" aria-label="오른쪽">▶</button>
+    <!-- 모바일 조작 버튼(삼각 배치, 한 손 조작) -->
+    <div id="touch-controls" class="rh">
+      <div class="tc-pad">
+        <button class="tc-btn tc-up" id="btn-jump" aria-label="점프·날기·던지기">▲</button>
+        <button class="tc-btn tc-l" id="btn-left" aria-label="왼쪽">◀</button>
+        <button class="tc-btn tc-r" id="btn-right" aria-label="오른쪽">▶</button>
       </div>
-      <button class="tc-btn tc-jump" id="btn-jump" aria-label="점프·날기·던지기">▲</button>
     </div>
 
     <!-- 시작 화면 -->
@@ -60,8 +60,9 @@
         <div class="meta-row">
           <span>🪙 <b id="coin-total">0</b></span>
           <span>🏆 <b id="high-score">0</b></span>
-          <span>📖 <b id="dex-count">0</b>/<span id="dex-max">15</span></span>
+          <span>📖 <b id="dex-count">0</b>/<span id="dex-max">25</span></span>
         </div>
+        <div class="hand-row">📱 조작 손: <button id="hand-toggle" class="hand-btn">오른손잡이</button></div>
         <div class="shop">
           <button class="up-btn" id="up-life">❤ 시작 목숨<br /><span class="up-info"></span></button>
           <button class="up-btn" id="up-jump">⬆ 점프력<br /><span class="up-info"></span></button>
@@ -83,9 +84,18 @@
       </div>
       <button id="retry-btn" class="btn">다시 도전</button>
     </div>
+
+    <!-- 보스 격파 → 귀환 메시지 화면 -->
+    <div id="relay-screen" class="overlay hidden">
+      <h1 id="relay-title">정복!</h1>
+      <div class="result">
+        <p id="relay-msg" class="relay-msg"></p>
+      </div>
+      <button id="relay-btn" class="btn">계속</button>
+    </div>
   </div>
 
-  <script src="js/elements.js?v=39"></script>
-  <script src="js/game.js?v=39"></script>
+  <script src="js/elements.js?v=40"></script>
+  <script src="js/game.js?v=40"></script>
 </body>
 </html>

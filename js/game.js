@@ -76,7 +76,7 @@
 
 
   // ===================== 상태 =====================
-  const STATE = { MENU: 0, PLAY: 1, OVER: 2 };
+  const STATE = { MENU: 0, PLAY: 1, OVER: 2, RELAY: 3 };
   let state = STATE.MENU;
 
   let player, items, particles, texts;
@@ -230,13 +230,31 @@
   bindHold("btn-right", function () { keyRight = true; }, function () { keyRight = false; });
   bindHold("btn-jump", function () { holdJump = true; press(); }, function () { holdJump = false; });
 
+  // 손잡이(왼손/오른손) 옵션 — 삼각 버튼 클러스터를 좌/우로
+  let handed = "r";
+  try { handed = localStorage.getItem("es_hand") || "r"; } catch (e) {}
+  const tcEl = document.getElementById("touch-controls");
+  const handBtn = document.getElementById("hand-toggle");
+  function applyHand() {
+    if (tcEl) { tcEl.classList.toggle("rh", handed === "r"); tcEl.classList.toggle("lh", handed === "l"); }
+    if (handBtn) handBtn.textContent = (handed === "r") ? "오른손잡이" : "왼손잡이";
+  }
+  applyHand();
+  if (handBtn) handBtn.addEventListener("click", function () {
+    handed = (handed === "r") ? "l" : "r";
+    try { localStorage.setItem("es_hand", handed); } catch (e) {}
+    applyHand();
+  });
+
   // ===================== 화면 전환 =====================
   const startScreen = document.getElementById("start-screen");
   const overScreen = document.getElementById("over-screen");
+  const relayScreen = document.getElementById("relay-screen");
   document.getElementById("start-btn").addEventListener("click", startGame);
   document.getElementById("retry-btn").addEventListener("click", function () {
     overScreen.classList.add("hidden"); startScreen.classList.remove("hidden");
   });
+  document.getElementById("relay-btn").addEventListener("click", advanceLap);
 
   function startGame() {
     initAudio(); if (actx && actx.state === "suspended") actx.resume();
@@ -587,7 +605,7 @@
     const catchR = 36 + META.up.magnet * 8;
     if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return false;
     learned[el.symbol] = true;
-    stored.push({ symbol: el.symbol, name: el.name, color: el.color });
+    stored.push({ symbol: el.symbol, name: el.name, color: el.color, period: el.period, group: el.group, number: el.number });
     score += 30; runCoins += 1;
     spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
     spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
@@ -680,7 +698,7 @@
     if (boss.win > 0) {                          // 승리 연출(멀어지며 쓰러짐)
       boss.win -= dt; boss.p += dt * 0.25;
       updateShots(dt);
-      if (boss.win <= 0) finishBoss();
+      if (boss.win <= 0) bossCleared();
       return;
     }
 
@@ -757,8 +775,26 @@
     }
   }
 
-  function finishBoss() {
-    lap++;                                        // 다음 랩(방향 반전·난이도↑)
+  // 보스 격파 → 귀환 메시지 화면(일시정지)
+  function bossCleared() {
+    const beatBear = (lap % 2 === 0);            // 짝수 랩: 남극→북극, 북극곰 격파(북극 정복)
+    const t = document.getElementById("relay-title");
+    const m = document.getElementById("relay-msg");
+    if (beatBear) {
+      t.textContent = "🐻‍❄️ 북극 정복!";
+      m.innerHTML = "📡 남극 기지에서 긴급 통신<br>「펭귄 대원, 남극에 비상사태! 즉시 귀환하라.」<br><br>🧭 방향을 돌려 <b>남극</b>으로!<br>이번 보스는 <b>바다표범</b> 🦭";
+    } else {
+      t.textContent = "🦭 남극 정복!";
+      m.innerHTML = "📡 북극 기지에서 긴급 통신<br>「다시 북극에 문제 발생! 돌아와 달라.」<br><br>🧭 방향을 돌려 <b>북극</b>으로!<br>이번 보스는 <b>북극곰</b> 🐻‍❄️";
+    }
+    bossActive = false; boss = null; shots = [];
+    state = STATE.RELAY;
+    relayScreen.classList.remove("hidden");
+  }
+  // 귀환 화면 [계속] → 다음 랩 시작(방향 반전·난이도↑)
+  function advanceLap() {
+    relayScreen.classList.add("hidden");
+    lap++;
     distance = lap * LAP_LEN + 60;
     bossActive = false; boss = null; shots = [];
     lastStage = -1; supplyStage = -1; lastCanyonStage = -1; bossTriggeredLap = -1;
@@ -767,7 +803,7 @@
     score += 600 * lap; runCoins += 8 * lap;
     bannerT = 2.8; bannerStage = 0;
     bannerText = (lap % 2 === 1) ? "🧭 북극 → 남극 (난이도 ↑)" : "🧭 남극 → 북극 (난이도 ↑)";
-    showToast("다음 보스: " + bossName() + "! 방향이 바뀌고 더 강해집니다.", true);
+    state = STATE.PLAY;
     updateHUD();
   }
 
@@ -925,6 +961,8 @@
     const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, "#ff6b6b"); g.addColorStop(1, "#ffa86b");
     ctx.fillStyle = g; ctx.fillRect(bx, by, bw * frac, bh);
     ctx.strokeStyle = "rgba(255,210,210,0.85)"; ctx.lineWidth = 1.5; ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = "#ffe08a"; ctx.font = "bold 12px sans-serif";   // 던질 통조림(탄약) 수
+    ctx.fillText("🥫 " + stored.length, W / 2, by + bh + 13);
     ctx.textAlign = "start"; ctx.restore();
   }
 
@@ -1013,7 +1051,7 @@
     ctx.save();
     if (shake > 0.2) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     drawBackground();
-    if (state === STATE.PLAY || state === STATE.OVER) {
+    if (state !== STATE.MENU) {
       drawHoles();                 // 크레바스/협곡: 도로 위 · 나머지보다 아래
       drawScenery();
       drawItems();                 // 통조림/따개(구덩이 위에 뜸)
@@ -1029,7 +1067,7 @@
 
   function drawOverlayFx() {
     if (screenFlash > 0) { ctx.fillStyle = "rgba(255,40,40," + (screenFlash * 0.45) + ")"; ctx.fillRect(0, 0, W, H); }
-    if (state === STATE.PLAY || state === STATE.OVER) { drawNav(); drawStored(); drawEnergyGauge(); drawStageBanner(); }
+    if (state !== STATE.MENU) { drawNav(); if (!bossActive) drawStored(); drawEnergyGauge(); drawStageBanner(); }
     if (bossActive && state === STATE.PLAY) drawBossHP();
   }
 
@@ -2124,18 +2162,30 @@
   }
 
   // 상단 통조림 보관함
+  // 상단 미니 주기율표 — 보유 통조림을 주기(행)·족(열) 자리에 분류색으로 채움
   function drawStored() {
-    if (!stored.length) return;
-    const n = Math.min(stored.length, 9);
-    const cw = 24, gap = 5, totalW = n * (cw + gap) - gap;
-    const sx = W / 2 - totalW / 2, y = 86;
-    ctx.fillStyle = "rgba(10,24,40,0.4)";
-    ctx.fillRect(sx - 8, y - 4, totalW + (stored.length > n ? 40 : 16), 30);
-    for (let i = 0; i < n; i++) drawMiniCan(sx + i * (cw + gap) + cw / 2, y + 13, stored[i]);
-    if (stored.length > n) {
-      ctx.fillStyle = "#cfe6ff"; ctx.textAlign = "left"; ctx.font = "bold 12px sans-serif";
-      ctx.fillText("+" + (stored.length - n), sx + totalW + 8, y + 18); ctx.textAlign = "start";
+    const cell = 13, rowH = 14, cols = 18, rows = 4, tableW = cols * cell;
+    const sx = W / 2 - tableW / 2, y0 = 78;
+    const cnt = {};
+    for (const c of stored) cnt[c.symbol] = (cnt[c.symbol] || 0) + 1;
+    ctx.fillStyle = "rgba(8,22,38,0.32)"; ctx.fillRect(sx - 4, y0 - 4, tableW + 8, rows * rowH + 6);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const el of ELEMENTS) {
+      const cx = sx + (el.group - 0.5) * cell;
+      const cy = y0 + (el.period - 0.5) * rowH;
+      const has = cnt[el.symbol] > 0;
+      if (has) {
+        ctx.fillStyle = el.color; ctx.fillRect(cx - cell / 2 + 0.5, cy - rowH / 2 + 1, cell - 1, rowH - 2);
+        ctx.fillStyle = "rgba(18,26,36,0.95)"; ctx.font = "bold 7px sans-serif"; ctx.fillText(el.symbol, cx, cy + 0.5);
+        if (cnt[el.symbol] > 1) { ctx.fillStyle = "rgba(10,18,28,0.9)"; ctx.font = "bold 5px sans-serif"; ctx.fillText(cnt[el.symbol], cx + cell * 0.32, cy - rowH * 0.28); }
+      } else {
+        ctx.fillStyle = "rgba(150,185,215,0.13)"; ctx.fillRect(cx - cell / 2 + 0.5, cy - rowH / 2 + 1, cell - 1, rowH - 2);
+      }
     }
+    // 보유 통조림 총 개수(보스전 탄약)
+    ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 11px sans-serif";
+    ctx.fillText("🥫" + stored.length, sx + tableW + 16, y0 + rows * rowH / 2);
+    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
   }
   function drawMiniCan(cx, cy, c) {
     const w = 20, h = 16;
@@ -2340,6 +2390,11 @@
     startBoss();
     const pm = location.search.match(/pose=([\d.]+)/);   // 포즈 고정(공격 모션 확인용)
     if (pm) { boss.intro = 0; boss.lane = 0; boss.throwT = +pm[1]; galleryMode = true; }
+  }
+  // ?relay: 보스 격파 귀환 화면 미리보기(=seal 이면 남극 정복)
+  if (location.search.indexOf("relay") >= 0) {
+    startGame(); if (location.search.indexOf("seal") >= 0) lap = 1;
+    bossCleared();
   }
   // ?mina: 서울 이스터에그(롯데타워 MINA + 불꽃놀이) 미리보기
   if (location.search.indexOf("mina") >= 0) {
