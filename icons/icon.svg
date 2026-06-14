@@ -15,6 +15,18 @@
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#dbe9f5"/>
     </linearGradient>
+    <linearGradient id="tinBody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6f8395"/>
+      <stop offset="0.42" stop-color="#f6fafe"/>
+      <stop offset="0.62" stop-color="#d3dde6"/>
+      <stop offset="1" stop-color="#69788a"/>
+    </linearGradient>
+    <linearGradient id="labelBlue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1c66a6"/>
+      <stop offset="0.45" stop-color="#5fb6ef"/>
+      <stop offset="0.62" stop-color="#2f8fe0"/>
+      <stop offset="1" stop-color="#1a5e9c"/>
+    </linearGradient>
     <clipPath id="round">
       <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
     </clipPath>
@@ -67,10 +79,25 @@
       <polygon points="240,328 272,328 256,340" fill="#d98f17"/>
     </g>
 
-    <!-- 원소 배지 (Fe) -->
-    <g transform="translate(372,372)">
-      <circle r="64" fill="#2f8fe0" stroke="#bfe8ff" stroke-width="6"/>
-      <text x="0" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="bold" fill="#ffffff">Fe</text>
+    <!-- Fe 통조림(재치있게 살짝 기울임, 라벨 그대로) -->
+    <g transform="translate(374,372) rotate(-13)">
+      <ellipse cx="10" cy="78" rx="54" ry="12" fill="#3a6da0" opacity="0.22"/>
+      <!-- 원통 몸통 -->
+      <rect x="-48" y="-44" width="96" height="100" fill="url(#tinBody)"/>
+      <ellipse cx="0" cy="56" rx="48" ry="14" fill="url(#tinBody)"/>
+      <ellipse cx="0" cy="56" rx="48" ry="14" fill="#000000" opacity="0.12"/>
+      <!-- 파란 라벨(위·아래로 감김) + Fe -->
+      <rect x="-48" y="-12" width="96" height="40" fill="url(#labelBlue)"/>
+      <ellipse cx="0" cy="28" rx="48" ry="11" fill="url(#labelBlue)"/>
+      <ellipse cx="0" cy="-12" rx="48" ry="11" fill="url(#labelBlue)"/>
+      <ellipse cx="0" cy="-12" rx="48" ry="11" fill="none" stroke="#d4ecff" stroke-width="2" opacity="0.55"/>
+      <text x="0" y="14" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#ffffff">Fe</text>
+      <!-- 윗뚜껑(테 + 안쪽 림) -->
+      <ellipse cx="0" cy="-44" rx="48" ry="14" fill="#eef4fa" stroke="#6f8294" stroke-width="3"/>
+      <ellipse cx="0" cy="-44" rx="39" ry="9.5" fill="none" stroke="#c2d2de" stroke-width="2"/>
+      <ellipse cx="-15" cy="-46" rx="15" ry="3.4" fill="#ffffff" opacity="0.75"/>
+      <!-- 세로 하이라이트 -->
+      <rect x="-31" y="-40" width="8" height="96" rx="4" fill="#ffffff" opacity="0.34"/>
     </g>
 
     <!-- 떨어지는 눈 -->
