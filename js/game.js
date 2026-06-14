@@ -159,7 +159,7 @@
       jumpV: 540,                          // 점프(hop) 속도(고정)
       flapT: 0,                            // 날갯짓 위상
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
-      lives: 2,                            // 기본 목숨(고정). 주기율표 완성 시 +1
+      lives: 1,                            // 기본 목숨 1. 추가 목숨은 주기율표 완성으로만
       stun: 0, tumble: 0,
       falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0, fallFromX: 0, fallDir: 1, fallHole: null,
     };
