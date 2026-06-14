@@ -2291,7 +2291,7 @@
     // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
     {
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
-      const pf = Math.min(1, pn / 12);
+      const pf = Math.min(1, pn / 26);                 // 더 천천히 빵빵해짐
       const cyp = -4, rx = 3.4 + 6.6 * pf, ry = 7 + 3.2 * pf, topY = cyp - ry;
       ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.5; ctx.lineCap = "round";    // 어깨끈
       ctx.beginPath(); ctx.moveTo(-rx * 0.5, topY + 1); ctx.lineTo(-4.5, -16); ctx.moveTo(rx * 0.5, topY + 1); ctx.lineTo(4.5, -16); ctx.stroke();

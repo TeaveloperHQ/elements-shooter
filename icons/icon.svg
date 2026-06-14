@@ -41,13 +41,18 @@
     <path d="M256 298 L120 512 H392 Z" fill="#dff1ff"/>
     <line x1="256" y1="320" x2="256" y2="512" stroke="#ffffff" stroke-width="6" stroke-dasharray="20 18" opacity="0.7"/>
 
-    <!-- 펭귄 -->
+    <!-- 펭귄(빨간 배낭 멘, 좀 더 나이 있어 보이는 인상) -->
     <g>
       <!-- 그림자 -->
       <ellipse cx="256" cy="452" rx="120" ry="26" fill="#3a6da0" opacity="0.25"/>
       <!-- 발 -->
       <ellipse cx="222" cy="446" rx="30" ry="15" fill="#f5a623"/>
       <ellipse cx="290" cy="446" rx="30" ry="15" fill="#f5a623"/>
+      <!-- 어깨 위로 보이는 빨간 배낭 -->
+      <ellipse cx="186" cy="262" rx="30" ry="26" fill="#c0392b"/>
+      <ellipse cx="326" cy="262" rx="30" ry="26" fill="#c0392b"/>
+      <ellipse cx="186" cy="256" rx="30" ry="10" fill="#a82e22"/>
+      <ellipse cx="326" cy="256" rx="30" ry="10" fill="#a82e22"/>
       <!-- 몸통(검정) -->
       <ellipse cx="256" cy="338" rx="116" ry="130" fill="#1b2733"/>
       <!-- 날개 -->
@@ -55,16 +60,24 @@
       <ellipse cx="362" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(-14 362 338)"/>
       <!-- 배(흰색) -->
       <ellipse cx="256" cy="356" rx="78" ry="104" fill="url(#belly)"/>
-      <!-- 눈 -->
-      <circle cx="226" cy="300" r="22" fill="#ffffff"/>
-      <circle cx="286" cy="300" r="22" fill="#ffffff"/>
-      <circle cx="231" cy="304" r="11" fill="#10171f"/>
-      <circle cx="281" cy="304" r="11" fill="#10171f"/>
-      <circle cx="227" cy="300" r="4" fill="#ffffff"/>
-      <circle cx="277" cy="300" r="4" fill="#ffffff"/>
+      <!-- 빨간 배낭 끈(가슴 가로지름) + 버클 -->
+      <path d="M214 296 L250 396" stroke="#c0392b" stroke-width="17" fill="none" stroke-linecap="round"/>
+      <path d="M298 296 L262 396" stroke="#c0392b" stroke-width="17" fill="none" stroke-linecap="round"/>
+      <rect x="238" y="388" width="36" height="24" rx="6" fill="#a82e22"/>
+      <rect x="248" y="395" width="16" height="10" rx="2" fill="#d8dde2"/>
+      <!-- 눈(작고 또렷) -->
+      <circle cx="226" cy="304" r="17" fill="#ffffff"/>
+      <circle cx="286" cy="304" r="17" fill="#ffffff"/>
+      <circle cx="230" cy="307" r="9" fill="#10171f"/>
+      <circle cx="282" cy="307" r="9" fill="#10171f"/>
+      <circle cx="227" cy="304" r="3.4" fill="#ffffff"/>
+      <circle cx="279" cy="304" r="3.4" fill="#ffffff"/>
+      <!-- 눈썹(진중한 인상으로 나이 있어보이게) -->
+      <path d="M205 282 Q226 274 247 284" stroke="#0c141c" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M265 284 Q286 274 307 282" stroke="#0c141c" stroke-width="8" fill="none" stroke-linecap="round"/>
       <!-- 부리 -->
-      <polygon points="240,328 272,328 256,352" fill="#f5a623"/>
-      <polygon points="240,328 272,328 256,340" fill="#d98f17"/>
+      <polygon points="240,332 272,332 256,356" fill="#f5a623"/>
+      <polygon points="240,332 272,332 256,344" fill="#d98f17"/>
     </g>
 
     <!-- 원소 배지 (Fe) -->
