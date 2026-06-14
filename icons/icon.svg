@@ -15,12 +15,6 @@
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#dbe9f5"/>
     </linearGradient>
-    <linearGradient id="tin" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#8093a5"/>
-      <stop offset="0.45" stop-color="#f4f9fd"/>
-      <stop offset="0.62" stop-color="#e4edf5"/>
-      <stop offset="1" stop-color="#7e92a4"/>
-    </linearGradient>
     <clipPath id="round">
       <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
     </clipPath>
@@ -47,55 +41,36 @@
     <path d="M256 298 L120 512 H392 Z" fill="#dff1ff"/>
     <line x1="256" y1="320" x2="256" y2="512" stroke="#ffffff" stroke-width="6" stroke-dasharray="20 18" opacity="0.7"/>
 
-    <!-- 펭귄: 몸통 + 동그란 머리, 멜빵, 날개로 Fe 통조림(Fedora)을 잡음 -->
+    <!-- 펭귄 -->
     <g>
       <!-- 그림자 -->
-      <ellipse cx="252" cy="462" rx="120" ry="22" fill="#3a6da0" opacity="0.25"/>
+      <ellipse cx="256" cy="452" rx="120" ry="26" fill="#3a6da0" opacity="0.25"/>
       <!-- 발 -->
-      <ellipse cx="224" cy="454" rx="29" ry="14" fill="#f5a623"/>
-      <ellipse cx="286" cy="454" rx="29" ry="14" fill="#f5a623"/>
-      <!-- 등 뒤 빨간 배낭(어깨 옆으로 살짝 보임) -->
-      <ellipse cx="166" cy="300" rx="30" ry="46" fill="#c0392b"/>
-      <ellipse cx="346" cy="300" rx="30" ry="46" fill="#c0392b"/>
-      <!-- 몸통(오뚜기 — 아래가 둥글게) -->
-      <path d="M256 250 C 324 250 360 304 360 362 C 360 426 316 462 256 462 C 196 462 152 426 152 362 C 152 304 188 250 256 250 Z" fill="#1b2733"/>
+      <ellipse cx="222" cy="446" rx="30" ry="15" fill="#f5a623"/>
+      <ellipse cx="290" cy="446" rx="30" ry="15" fill="#f5a623"/>
+      <!-- 몸통(검정) -->
+      <ellipse cx="256" cy="338" rx="116" ry="130" fill="#1b2733"/>
       <!-- 날개 -->
-      <ellipse cx="156" cy="356" rx="24" ry="56" fill="#11202b" transform="rotate(14 156 356)"/>
-      <ellipse cx="356" cy="360" rx="24" ry="58" fill="#11202b" transform="rotate(-30 356 360)"/>
+      <ellipse cx="150" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(14 150 338)"/>
+      <ellipse cx="362" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(-14 362 338)"/>
       <!-- 배(흰색) -->
-      <ellipse cx="256" cy="372" rx="70" ry="82" fill="url(#belly)"/>
-      <!-- 멜빵(빨간 어깨끈 2줄 + 허리밴드 + 은색 버클) -->
-      <rect x="216" y="270" width="20" height="146" rx="8" fill="#c0392b"/>
-      <rect x="276" y="270" width="20" height="146" rx="8" fill="#c0392b"/>
-      <rect x="206" y="398" width="100" height="22" rx="8" fill="#a82e22"/>
-      <rect x="219" y="356" width="14" height="12" rx="2" fill="#d8dde2"/>
-      <rect x="279" y="356" width="14" height="12" rx="2" fill="#d8dde2"/>
-      <!-- 동그란 머리(몸통 위) -->
-      <circle cx="256" cy="200" r="74" fill="#1b2733"/>
+      <ellipse cx="256" cy="356" rx="78" ry="104" fill="url(#belly)"/>
       <!-- 눈 -->
-      <circle cx="230" cy="196" r="17" fill="#ffffff"/>
-      <circle cx="282" cy="196" r="17" fill="#ffffff"/>
-      <circle cx="234" cy="199" r="9" fill="#10171f"/>
-      <circle cx="278" cy="199" r="9" fill="#10171f"/>
-      <circle cx="231" cy="196" r="3.4" fill="#ffffff"/>
-      <circle cx="275" cy="196" r="3.4" fill="#ffffff"/>
-      <!-- 눈썹(진중한 인상) -->
-      <path d="M210 174 Q230 167 249 176" stroke="#0c141c" stroke-width="7" fill="none" stroke-linecap="round"/>
-      <path d="M263 176 Q282 167 302 174" stroke="#0c141c" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <circle cx="226" cy="300" r="22" fill="#ffffff"/>
+      <circle cx="286" cy="300" r="22" fill="#ffffff"/>
+      <circle cx="231" cy="304" r="11" fill="#10171f"/>
+      <circle cx="281" cy="304" r="11" fill="#10171f"/>
+      <circle cx="227" cy="300" r="4" fill="#ffffff"/>
+      <circle cx="277" cy="300" r="4" fill="#ffffff"/>
       <!-- 부리 -->
-      <polygon points="240,222 272,222 256,248" fill="#f5a623"/>
-      <polygon points="240,222 272,222 256,234" fill="#d98f17"/>
-      <!-- Fe 통조림(Fedora) — 오른쪽 날개로 잡음 -->
-      <g transform="translate(372,384)">
-        <rect x="-42" y="-52" width="84" height="104" rx="7" fill="url(#tin)" stroke="#6f8294" stroke-width="3"/>
-        <rect x="-37" y="-52" width="8" height="104" fill="#ffffff" opacity="0.5"/>
-        <rect x="-42" y="-16" width="84" height="44" fill="#2f8fe0"/>
-        <rect x="-42" y="-16" width="84" height="7" fill="#ffffff" opacity="0.25"/>
-        <text x="0" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#ffffff">Fe</text>
-        <ellipse cx="0" cy="-52" rx="42" ry="9" fill="#eef4fa" stroke="#6f8294" stroke-width="3"/>
-      </g>
-      <!-- 캔을 감싸는 날개 끝(잡는 모습) -->
-      <ellipse cx="338" cy="388" rx="16" ry="30" fill="#11202b" transform="rotate(-26 338 388)"/>
+      <polygon points="240,328 272,328 256,352" fill="#f5a623"/>
+      <polygon points="240,328 272,328 256,340" fill="#d98f17"/>
+    </g>
+
+    <!-- 원소 배지 (Fe) -->
+    <g transform="translate(372,372)">
+      <circle r="64" fill="#2f8fe0" stroke="#bfe8ff" stroke-width="6"/>
+      <text x="0" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="bold" fill="#ffffff">Fe</text>
     </g>
 
     <!-- 떨어지는 눈 -->
