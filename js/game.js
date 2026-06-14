@@ -684,7 +684,7 @@
       SND.bad(); return;
     }
     const c = stored.pop();
-    shots.push({ kind: "can", lane: playerLane(), p: 0.98, sym: c.symbol, color: c.color, spin: 0 });
+    shots.push({ kind: "can", lane: playerLane(), p: 0.98, sym: c.symbol, group: c.group, spin: 0 });
     spawnParticles(player.x, playerLineY() - 26, "#ffe08a", 6, 140);
     SND.jump(); updateHUD();
   }
@@ -927,8 +927,8 @@
         ctx.save(); ctx.translate(x, y - 8 * sc); ctx.rotate(s.spin); ctx.scale(sc, sc);
         ctx.fillStyle = "#cfd8e0"; ctx.strokeStyle = "#8a98a4"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.rect(-7, -9, 14, 18); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#2f8fe0"; ctx.fillRect(-7, -3, 14, 6);   // 파란 라벨 통일
-        ctx.fillStyle = "#fff"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = groupColor(s.group); ctx.fillRect(-7, -3, 14, 6);   // 족별 라벨
+        ctx.fillStyle = "#16273a"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(s.sym || "", 0, 2); ctx.textAlign = "start";
         ctx.restore();
       } else if (s.kind === "water") {            // 바다표범 물대포
@@ -2079,10 +2079,10 @@
     ctx.fillStyle = g; ctx.fillRect(x - cw / 2, top, cw, ch);
     // 세로 광택
     ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(x - cw * 0.34, top, cw * 0.1, ch);
-    // 라벨 밴드 + 원소 기호
-    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.5);
-    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.08);
-    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold " + (ch * 0.42) + "px sans-serif";
+    // 라벨 밴드(족별 색) + 원소 기호
+    ctx.fillStyle = groupColor(o.el.group); ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.5);
+    ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(x - cw / 2, top + ch * 0.26, cw, ch * 0.08);
+    ctx.fillStyle = "#16273a"; ctx.textAlign = "center"; ctx.font = "bold " + (ch * 0.42) + "px sans-serif";
     ctx.fillText(o.el.symbol, x, top + ch * 0.6);
     // 라벨 아래 작은 정어리 그림
     const fy = top + ch * 0.9, fl = cw * 0.16;
@@ -2161,36 +2161,33 @@
     oSparkle(x - 9 * sc, cy + 3 * sc, 1.1 * sc, "rgba(255,255,255,0.7)");
   }
 
-  // 상단 보유 통조림 — 자연스러운 캔 줄(원소 번호순), 중복은 밑에 ×개수
+  // 상단 보유 통조림 — 캔 모양 유지, 주기(행)·족(열) 위치에 배치, 라벨색은 족별
   function drawStored() {
     if (!stored.length) return;
-    const map = {}, order = [];
-    for (const c of stored) { if (map[c.symbol] == null) { map[c.symbol] = { symbol: c.symbol, number: c.number || 0, n: 0 }; order.push(c.symbol); } map[c.symbol].n++; }
-    const list = order.map(function (k) { return map[k]; }).sort(function (a, b) { return a.number - b.number; });
-    const cw = 18, step = 23, perRow = Math.max(1, Math.floor((W - 16) / step));
-    const rows = Math.ceil(list.length / perRow), rowH = 30, y0 = 80;
-    for (let i = 0; i < list.length; i++) {
-      const r = Math.floor(i / perRow), ci = i % perRow;
-      const inRow = (r < rows - 1) ? perRow : (list.length - r * perRow);
-      const rowW = inRow * step - (step - cw);
-      const sx = W / 2 - rowW / 2;
-      drawTopCan(sx + ci * step + cw / 2, y0 + r * rowH, list[i].symbol, list[i].n);
+    const cnt = {};
+    for (const c of stored) cnt[c.symbol] = (cnt[c.symbol] || 0) + 1;
+    const cell = 24, rowH = 21, y0 = 74, sx = W / 2 - (18 * cell) / 2;
+    for (const el of ELEMENTS) {
+      if (!cnt[el.symbol]) continue;                 // 보유한 것만
+      const cx = sx + (el.group - 0.5) * cell;
+      const cy = y0 + (el.period - 0.5) * rowH;
+      drawTopCan(cx, cy, el.symbol, cnt[el.symbol], el.group);
     }
   }
-  // 작은 파란 통조림(상단/보관) — 라벨 파랑 통일
-  function drawTopCan(cx, cyc, symbol, n) {
-    const w = 18, h = 14, top = cyc - h / 2;
+  // 작은 통조림(상단/보관) — 라벨색은 족(group)별
+  function drawTopCan(cx, cyc, symbol, n, group) {
+    const w = 18, h = 13, top = cyc - h / 2;
     const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
     g.addColorStop(0, "#7f93a6"); g.addColorStop(0.45, "#f3f8fc"); g.addColorStop(0.6, "#e4edf5"); g.addColorStop(1, "#7d91a3");
     ctx.fillStyle = g; ctx.fillRect(cx - w / 2, top, w, h);
     ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fillRect(cx - w * 0.32, top, w * 0.09, h);          // 세로 광택
-    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.5);                 // 파란 라벨 밴드
-    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.07);
-    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 7px sans-serif";
+    ctx.fillStyle = groupColor(group); ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.5);          // 족별 라벨 밴드
+    ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.07);
+    ctx.fillStyle = "#16273a"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 7px sans-serif";
     ctx.fillText(symbol, cx, top + h * 0.55);
     ctx.fillStyle = "#eef4fa"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = 1;          // 뚜껑
-    ctx.beginPath(); ctx.ellipse(cx, top, w / 2, 2.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (n > 1) { ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 9px sans-serif"; ctx.fillText("×" + n, cx, cyc + h * 0.5 + 7); }
+    ctx.beginPath(); ctx.ellipse(cx, top, w / 2, 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (n > 1) { ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 8px sans-serif"; ctx.fillText("×" + n, cx, cyc + h * 0.5 + 6); }
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "start";
   }
 
@@ -2275,22 +2272,18 @@
     ctx.closePath(); ctx.fill();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
-    // 빨간 배낭(등) — 모은 캔이 늘수록 아래에서 위로 채워짐
+    // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
     {
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
       const pf = Math.min(1, pn / 12);
-      const px = -7, py = -12, pw = 14, ph = 15, pr = 3.2;
-      const packPath = function () { ctx.beginPath(); ctx.moveTo(px + pr, py); ctx.arcTo(px + pw, py, px + pw, py + ph, pr); ctx.arcTo(px + pw, py + ph, px, py + ph, pr); ctx.arcTo(px, py + ph, px, py, pr); ctx.arcTo(px, py, px + pw, py, pr); ctx.closePath(); };
-      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.5; ctx.lineCap = "round";   // 어깨끈
-      ctx.beginPath(); ctx.moveTo(px + 3, py); ctx.lineTo(px + 2, -3); ctx.moveTo(px + pw - 3, py); ctx.lineTo(px + pw - 2, -3); ctx.stroke();
-      ctx.fillStyle = "#7c2018"; packPath(); ctx.fill();                         // 빈 배낭(어두운 빨강)
-      ctx.save(); packPath(); ctx.clip();                                        // 채움(아래→위)
-      ctx.fillStyle = "#e23b3b"; ctx.fillRect(px, py + ph - ph * pf, pw, ph * pf);
-      ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(px, py + ph - ph * pf, pw, 1.3);
-      ctx.restore();
-      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1; packPath(); ctx.stroke();  // 테두리
-      ctx.fillStyle = "#c0392b"; ctx.fillRect(px - 0.5, py - 0.5, pw + 1, 4.6);  // 플랩
-      ctx.fillStyle = "#d8dde2"; ctx.fillRect(-1.6, py + 4, 3.2, 2);             // 은색 버클
+      const cyp = -4, rx = 3.4 + 6.6 * pf, ry = 7 + 3.2 * pf, topY = cyp - ry;
+      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.5; ctx.lineCap = "round";    // 어깨끈
+      ctx.beginPath(); ctx.moveTo(-rx * 0.5, topY + 1); ctx.lineTo(-4.5, -16); ctx.moveTo(rx * 0.5, topY + 1); ctx.lineTo(4.5, -16); ctx.stroke();
+      ctx.fillStyle = "#d8392c"; ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1;  // 둥근 주머니(아래가 볼록)
+      ctx.beginPath(); ctx.ellipse(0, cyp, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(120,24,16,0.3)"; ctx.beginPath(); ctx.ellipse(rx * 0.36, cyp + ry * 0.08, rx * 0.5, ry * 0.85, 0, 0, Math.PI * 2); ctx.fill();  // 측면 음영
+      ctx.fillStyle = "#b62f24"; ctx.beginPath(); ctx.ellipse(0, topY + ry * 0.34, rx * 0.96, ry * 0.34, 0, 0, Math.PI * 2); ctx.fill();   // 윗뚜껑
+      ctx.fillStyle = "#d8dde2"; ctx.fillRect(-1.6, cyp - 1, 3.2, 2.2);          // 은색 버클
     }
     // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(뿌리가 몸통에 묻힘)
     ctx.fillStyle = "#0e1a24";

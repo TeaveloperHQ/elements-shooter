@@ -50,6 +50,14 @@ const ELEMENTS = [
   E(25, "Mn", "망가니즈", 4, 7,  "transition"),
 ];
 
+// 족(group)별 라벨 색 — 표준 주기율표 분류색 계열
+const GROUP_COLOR = {
+  1: "#ff6b6b", 2: "#ffb066",                                  // 알칼리 / 알칼리토
+  3: "#ffb0c4", 4: "#ffb0c4", 5: "#ffb0c4", 6: "#ffb0c4", 7: "#ffb0c4",  // 전이금속
+  13: "#caa978", 14: "#cccc7a", 15: "#86e08a", 16: "#ffe24e", 17: "#ffc24e", 18: "#7fd6e8",
+};
+function groupColor(g) { return GROUP_COLOR[g] || "#9fb6c8"; }
+
 // 통조림은 모든 원소에서 등장
 const BUFF_ELEMENTS = ELEMENTS;
 const TRAP_ELEMENTS = [];
