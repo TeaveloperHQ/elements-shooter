@@ -79,25 +79,21 @@
       <polygon points="240,328 272,328 256,340" fill="#d98f17"/>
     </g>
 
-    <!-- Fe 통조림(재치있게 살짝 기울임, 라벨 그대로) -->
+    <!-- Fe 통조림(불투명 3D, 살짝 기울임, 라벨 그대로) -->
     <g transform="translate(374,372) rotate(-13)">
-      <ellipse cx="10" cy="78" rx="54" ry="12" fill="#3a6da0" opacity="0.22"/>
-      <!-- 원통 몸통 -->
-      <rect x="-48" y="-44" width="96" height="100" fill="url(#tinBody)"/>
-      <ellipse cx="0" cy="56" rx="48" ry="14" fill="url(#tinBody)"/>
-      <ellipse cx="0" cy="56" rx="48" ry="14" fill="#000000" opacity="0.12"/>
-      <!-- 파란 라벨(위·아래로 감김) + Fe -->
-      <rect x="-48" y="-12" width="96" height="40" fill="url(#labelBlue)"/>
-      <ellipse cx="0" cy="28" rx="48" ry="11" fill="url(#labelBlue)"/>
-      <ellipse cx="0" cy="-12" rx="48" ry="11" fill="url(#labelBlue)"/>
-      <ellipse cx="0" cy="-12" rx="48" ry="11" fill="none" stroke="#d4ecff" stroke-width="2" opacity="0.55"/>
-      <text x="0" y="14" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#ffffff">Fe</text>
-      <!-- 윗뚜껑(테 + 안쪽 림) -->
-      <ellipse cx="0" cy="-44" rx="48" ry="14" fill="#eef4fa" stroke="#6f8294" stroke-width="3"/>
-      <ellipse cx="0" cy="-44" rx="39" ry="9.5" fill="none" stroke="#c2d2de" stroke-width="2"/>
-      <ellipse cx="-15" cy="-46" rx="15" ry="3.4" fill="#ffffff" opacity="0.75"/>
+      <ellipse cx="10" cy="74" rx="52" ry="11" fill="#3a6da0" opacity="0.22"/>
+      <!-- 캔 옆면(원통: 가로 그라데이션 + 둥근 바닥) -->
+      <rect x="-48" y="-44" width="96" height="102" rx="16" fill="url(#tinBody)"/>
+      <!-- 파란 라벨(가로 밴드) + Fe -->
+      <rect x="-48" y="-10" width="96" height="42" fill="url(#labelBlue)"/>
+      <rect x="-48" y="-10" width="96" height="5" fill="#ffffff" opacity="0.22"/>
+      <text x="0" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#ffffff">Fe</text>
+      <!-- 윗뚜껑(타원) + 안쪽 림 + 반사 -->
+      <ellipse cx="0" cy="-44" rx="48" ry="13" fill="#eef4fa" stroke="#6f8294" stroke-width="3"/>
+      <ellipse cx="0" cy="-44" rx="39" ry="9" fill="none" stroke="#c2d2de" stroke-width="2"/>
+      <ellipse cx="-15" cy="-46" rx="14" ry="3.2" fill="#ffffff" opacity="0.72"/>
       <!-- 세로 하이라이트 -->
-      <rect x="-31" y="-40" width="8" height="96" rx="4" fill="#ffffff" opacity="0.34"/>
+      <rect x="-31" y="-34" width="8" height="88" rx="4" fill="#ffffff" opacity="0.32"/>
     </g>
 
     <!-- 떨어지는 눈 -->
