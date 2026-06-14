@@ -2275,11 +2275,11 @@
     ctx.moveTo(-4, 2); ctx.lineTo(-1.3, 10.5); ctx.lineTo(-0.3, 3);
     ctx.lineTo(0.3, 3); ctx.lineTo(1.3, 10.5); ctx.lineTo(4, 2);
     ctx.closePath(); ctx.fill();
-    // 몸통 — 머리통 없는 둥근 계란형(아이콘 펭귄 뒷모습)
-    const bg = ctx.createLinearGradient(-9, -26, 9, 7);
+    // 몸통 — 머리통 거의 없는 둥근 몸(아이콘 펭귄 뒷모습)
+    const bg = ctx.createLinearGradient(-9, -21, 9, 7);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.ellipse(0, -9, 13, 16, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -6, 13, 13.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
     // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
@@ -2287,10 +2287,10 @@
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
       const pf = Math.min(1, pn / 26);                 // 더 천천히 빵빵해짐
       const cyp = -4, rx = 3.4 + 6.6 * pf, ry = 7 + 3.2 * pf, topY = cyp - ry;
-      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.6; ctx.lineCap = "round";    // 어깨끈(목을 두르듯 넓게)
+      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.6; ctx.lineCap = "round";    // 어깨끈(어깨에만)
       ctx.beginPath();
-      ctx.moveTo(-rx * 0.55, topY + 1); ctx.quadraticCurveTo(-11.5, -11, -9.5, -20);
-      ctx.moveTo(rx * 0.55, topY + 1); ctx.quadraticCurveTo(11.5, -11, 9.5, -20);
+      ctx.moveTo(-rx * 0.55, topY + 1); ctx.lineTo(-9, -13);
+      ctx.moveTo(rx * 0.55, topY + 1); ctx.lineTo(9, -13);
       ctx.stroke();
       ctx.fillStyle = "#d8392c"; ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1;  // 둥근 주머니(아래가 볼록)
       ctx.beginPath(); ctx.ellipse(0, cyp, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
