@@ -160,7 +160,7 @@
       flapT: 0,                            // 날갯짓 위상
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
       lives: 1 + META.up.life,
-      stun: 0, tumble: 0, dexLifeGiven: false,
+      stun: 0, tumble: 0,
       falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0, fallFromX: 0, fallDir: 1, fallHole: null,
     };
     holdJump = false;
@@ -606,11 +606,13 @@
     spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
     SND.flag();
     showToast(el.symbol + " = " + el.name + " 통조림 획득! (위에 모임)", false);
-    // 주기율표(1~25) 완성 → 목숨 +1(추락·피격 시 한 번 부활)
-    if (!player.dexLifeGiven && Object.keys(learned).length >= ELEMENTS.length) {
-      player.dexLifeGiven = true; player.lives++;
+    // 주기율표(1~25) 완성 → 목숨 +1, 그리고 모은 원소·통조림 전부 리셋(배낭도 홀쭉) → 다시 채우면 또 획득
+    if (Object.keys(learned).length >= ELEMENTS.length) {
+      player.lives++;
+      for (const s in learned) META.dex[s] = true;   // 영구 도감엔 보존
+      learned = {}; stored = [];                       // 주기율표·배낭 리셋
       spawnText(player.x, playerLineY() - 92, "주기율표 완성! 목숨 +1 ❤", "#ffe678", 22);
-      showToast("📖 주기율표 완성! 목숨 +1 — 떨어지거나 맞아도 한 번 부활!", false);
+      showToast("📖 주기율표 완성! 목숨 +1 — 원소·배낭 리셋!", false);
       shake = Math.min(14, shake + 8); SND.base();
     }
     updateHUD();
