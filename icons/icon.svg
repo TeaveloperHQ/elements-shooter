@@ -15,6 +15,12 @@
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#dbe9f5"/>
     </linearGradient>
+    <linearGradient id="tin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8093a5"/>
+      <stop offset="0.45" stop-color="#f4f9fd"/>
+      <stop offset="0.62" stop-color="#e4edf5"/>
+      <stop offset="1" stop-color="#7e92a4"/>
+    </linearGradient>
     <clipPath id="round">
       <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
     </clipPath>
@@ -41,49 +47,51 @@
     <path d="M256 298 L120 512 H392 Z" fill="#dff1ff"/>
     <line x1="256" y1="320" x2="256" y2="512" stroke="#ffffff" stroke-width="6" stroke-dasharray="20 18" opacity="0.7"/>
 
-    <!-- 펭귄(빨간 배낭 멘, 좀 더 나이 있어 보이는 인상) -->
+    <!-- 펭귄(오뚜기형, 빨간 배낭은 등 뒤로 살짝 보임) -->
     <g>
       <!-- 그림자 -->
-      <ellipse cx="256" cy="452" rx="120" ry="26" fill="#3a6da0" opacity="0.25"/>
+      <ellipse cx="256" cy="456" rx="118" ry="24" fill="#3a6da0" opacity="0.25"/>
       <!-- 발 -->
-      <ellipse cx="222" cy="446" rx="30" ry="15" fill="#f5a623"/>
-      <ellipse cx="290" cy="446" rx="30" ry="15" fill="#f5a623"/>
-      <!-- 어깨 위로 보이는 빨간 배낭 -->
-      <ellipse cx="186" cy="262" rx="30" ry="26" fill="#c0392b"/>
-      <ellipse cx="326" cy="262" rx="30" ry="26" fill="#c0392b"/>
-      <ellipse cx="186" cy="256" rx="30" ry="10" fill="#a82e22"/>
-      <ellipse cx="326" cy="256" rx="30" ry="10" fill="#a82e22"/>
-      <!-- 몸통(검정) -->
-      <ellipse cx="256" cy="338" rx="116" ry="130" fill="#1b2733"/>
-      <!-- 날개 -->
-      <ellipse cx="150" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(14 150 338)"/>
-      <ellipse cx="362" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(-14 362 338)"/>
-      <!-- 배(흰색) -->
-      <ellipse cx="256" cy="356" rx="78" ry="104" fill="url(#belly)"/>
-      <!-- 빨간 배낭 끈(가슴 가로지름) + 버클 -->
-      <path d="M214 296 L250 396" stroke="#c0392b" stroke-width="17" fill="none" stroke-linecap="round"/>
-      <path d="M298 296 L262 396" stroke="#c0392b" stroke-width="17" fill="none" stroke-linecap="round"/>
-      <rect x="238" y="388" width="36" height="24" rx="6" fill="#a82e22"/>
-      <rect x="248" y="395" width="16" height="10" rx="2" fill="#d8dde2"/>
+      <ellipse cx="224" cy="450" rx="30" ry="14" fill="#f5a623"/>
+      <ellipse cx="288" cy="450" rx="30" ry="14" fill="#f5a623"/>
+      <!-- 등 뒤 빨간 배낭(몸 뒤로 살짝 보임) -->
+      <rect x="156" y="250" width="200" height="150" rx="48" fill="#c0392b"/>
+      <rect x="156" y="250" width="200" height="40" rx="20" fill="#a82e22"/>
+      <!-- 어깨 위로 넘어가는 끈 끝(얼굴엔 안 걸침) -->
+      <rect x="176" y="232" width="20" height="40" rx="9" fill="#a82e22"/>
+      <rect x="316" y="232" width="20" height="40" rx="9" fill="#a82e22"/>
+      <!-- 몸통(오뚜기 — 위는 좁고 아래는 둥글게) -->
+      <path d="M256 176 C 322 176 360 244 360 322 C 360 414 314 458 256 458 C 198 458 152 414 152 322 C 152 244 190 176 256 176 Z" fill="#1b2733"/>
+      <!-- 날개(짧은 플리퍼) -->
+      <ellipse cx="166" cy="338" rx="26" ry="64" fill="#11202b" transform="rotate(12 166 338)"/>
+      <ellipse cx="346" cy="338" rx="26" ry="64" fill="#11202b" transform="rotate(-12 346 338)"/>
+      <!-- 배(흰색, 아래로 둥글게) -->
+      <ellipse cx="256" cy="364" rx="74" ry="92" fill="url(#belly)"/>
       <!-- 눈(작고 또렷) -->
-      <circle cx="226" cy="304" r="17" fill="#ffffff"/>
-      <circle cx="286" cy="304" r="17" fill="#ffffff"/>
-      <circle cx="230" cy="307" r="9" fill="#10171f"/>
-      <circle cx="282" cy="307" r="9" fill="#10171f"/>
-      <circle cx="227" cy="304" r="3.4" fill="#ffffff"/>
-      <circle cx="279" cy="304" r="3.4" fill="#ffffff"/>
-      <!-- 눈썹(진중한 인상으로 나이 있어보이게) -->
-      <path d="M205 282 Q226 274 247 284" stroke="#0c141c" stroke-width="8" fill="none" stroke-linecap="round"/>
-      <path d="M265 284 Q286 274 307 282" stroke="#0c141c" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <circle cx="228" cy="296" r="16" fill="#ffffff"/>
+      <circle cx="284" cy="296" r="16" fill="#ffffff"/>
+      <circle cx="232" cy="299" r="8.5" fill="#10171f"/>
+      <circle cx="280" cy="299" r="8.5" fill="#10171f"/>
+      <circle cx="229" cy="296" r="3.2" fill="#ffffff"/>
+      <circle cx="277" cy="296" r="3.2" fill="#ffffff"/>
+      <!-- 눈썹(진중한 인상) -->
+      <path d="M208 276 Q228 269 247 278" stroke="#0c141c" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M265 278 Q284 269 304 276" stroke="#0c141c" stroke-width="7" fill="none" stroke-linecap="round"/>
       <!-- 부리 -->
-      <polygon points="240,332 272,332 256,356" fill="#f5a623"/>
-      <polygon points="240,332 272,332 256,344" fill="#d98f17"/>
+      <polygon points="240,322 272,322 256,346" fill="#f5a623"/>
+      <polygon points="240,322 272,322 256,334" fill="#d98f17"/>
     </g>
 
-    <!-- 원소 배지 (Fe) -->
-    <g transform="translate(372,372)">
-      <circle r="64" fill="#2f8fe0" stroke="#bfe8ff" stroke-width="6"/>
-      <text x="0" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="bold" fill="#ffffff">Fe</text>
+    <!-- Fe 통조림 깡통 (Fedora) -->
+    <g transform="translate(384,366)">
+      <ellipse cx="0" cy="66" rx="54" ry="12" fill="#3a6da0" opacity="0.22"/>
+      <rect x="-52" y="-62" width="104" height="126" rx="8" fill="url(#tin)" stroke="#6f8294" stroke-width="3"/>
+      <rect x="-46" y="-62" width="10" height="126" fill="#ffffff" opacity="0.5"/>
+      <rect x="-52" y="-18" width="104" height="52" fill="#2f8fe0"/>
+      <rect x="-52" y="-18" width="104" height="8" fill="#ffffff" opacity="0.25"/>
+      <text x="0" y="22" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#ffffff">Fe</text>
+      <ellipse cx="0" cy="-62" rx="52" ry="11" fill="#eef4fa" stroke="#6f8294" stroke-width="3"/>
+      <ellipse cx="-16" cy="-63" rx="16" ry="3.5" fill="#ffffff" opacity="0.7"/>
     </g>
 
     <!-- 떨어지는 눈 -->
