@@ -283,12 +283,7 @@
   }
 
   // ===================== HUD / 토스트 =====================
-  function updateHUD() {
-    document.getElementById("hud-lives").textContent = player.lives;
-    document.getElementById("hud-dist").textContent = Math.floor(distance / 10);
-    document.getElementById("hud-elem").textContent = Object.keys(learned).length;
-    document.getElementById("hud-score").textContent = Math.floor(score);
-  }
+  function updateHUD() { /* 상단 카드 제거됨 — 네비게이션만 표시 */ }
   let toastTimer = null;
   function showToast(text, danger) {
     const t = document.getElementById("toast");
@@ -325,10 +320,10 @@
     for (let r = 0; r < rows; r++) { const jr = []; for (let c = 0; c < cols; c++) jr.push((Math.random() * 2 - 1) * 9); jit.push(jr); }
     return { nodes: nodes, rows: rows, cols: cols, jit: jit };
   }
-  function spawnObstacle() {
+  function spawnObstacle(allowHole) {
     let r = Math.random();
-    // 겹침 방지: 협곡이 떠 있거나, 다른 구덩이가 아직 가까이(p<0.28) 있으면 크레바스 대신 통조림
-    if (r < 0.35 && items.some(function (o) { return o.canyon || (o.type === "hole" && o.p < 0.28); })) r = 0.6;
+    // 크레바스 금지(협곡 직전 구간) 또는 겹침 방지(협곡 존재/다른 구덩이 근접) → 통조림으로
+    if (r < 0.35 && (allowHole === false || items.some(function (o) { return o.canyon || (o.type === "hole" && o.p < 0.28); }))) r = 0.6;
     if (r < 0.35) {
       // 보통 크레바스 — 점프로 넘기, 옆으로 피하기 가능 (큰 협곡은 스테이지 끝에만)
       const lane = (-1 + ((Math.random() * 3) | 0)) * 0.4;
@@ -348,8 +343,6 @@
 
   // 거대 협곡(스테이지 끝) — 길을 가로지름. 점프로는 못 넘고 에너지 모아 비행으로 건너야 함
   function spawnCanyon() {
-    // 접근 중인 보통 크레바스 제거(길 전체를 가로지르는 협곡과 겹치지 않게)
-    items = items.filter(function (o) { return !(o.type === "hole" && !o.canyon && o.p < 0.92); });
     items.push({ type: "hole", canyon: true, lane: 0, p: 0, vp: 0.10, done: false, cleared: false,
       w: 1.3, len: 0.08, shape: makeJagged() });
     showToast("⚠ 거대 협곡! 에너지를 모아 날아서 건너세요!", true);
@@ -435,10 +428,6 @@
     if (bossActive) {
       updateBoss(dt);
     } else {
-      // 스폰(속도에 비례해 잦아짐)
-      spawnTimer -= dt;
-      if (spawnTimer <= 0) { spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012); spawnObstacle(); }
-
       // 스테이지 전환 알림(랩/방향 인식)
       const ord = stageOrdinal();
       if (ord !== lastStage) {
@@ -449,6 +438,12 @@
       }
       const inStage = lapDist() - ord * STAGE_LEN;
       const lastOrd = STAGES.length - 1;
+      // 스폰(속도에 비례해 잦아짐) — 협곡 직전 구간(끝 18%)엔 크레바스 금지(겹침·갑작 제거 방지)
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnTimer = Math.max(0.6, 1.5 - elapsed * 0.012);
+        spawnObstacle(!(ord < lastOrd && inStage > STAGE_LEN * 0.82));
+      }
       // 협곡 직전 보급(마지막 스테이지 제외)
       if (ord < lastOrd && supplyStage !== ord && inStage > STAGE_LEN * 0.6) {
         supplyStage = ord;
