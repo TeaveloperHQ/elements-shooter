@@ -2275,17 +2275,11 @@
     ctx.moveTo(-4, 2); ctx.lineTo(-1.3, 10.5); ctx.lineTo(-0.3, 3);
     ctx.lineTo(0.3, 3); ctx.lineTo(1.3, 10.5); ctx.lineTo(4, 2);
     ctx.closePath(); ctx.fill();
-    // 머리+몸통 — 전체가 매끄러운 계란 모양(아이콘과 결 맞춤)
-    const bg = ctx.createLinearGradient(-9, -30, 9, 7);
+    // 몸통 — 머리통 없는 둥근 계란형(아이콘 펭귄 뒷모습)
+    const bg = ctx.createLinearGradient(-9, -26, 9, 7);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(0, -29);
-    ctx.bezierCurveTo(9, -29, 12.6, -16, 12.6, -2);    // 위(머리) 좁고 → 가장 넓은 곳
-    ctx.bezierCurveTo(12.6, 5, 8, 7.5, 0, 7.5);        // 아래 둥글게
-    ctx.bezierCurveTo(-8, 7.5, -12.6, 5, -12.6, -2);
-    ctx.bezierCurveTo(-12.6, -16, -9, -29, 0, -29);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -9, 13, 16, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
     // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
