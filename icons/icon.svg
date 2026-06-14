@@ -67,9 +67,9 @@
       <ellipse cx="362" cy="338" rx="32" ry="86" fill="#11202b" transform="rotate(-14 362 338)"/>
       <!-- 배(흰색) -->
       <ellipse cx="256" cy="356" rx="78" ry="104" fill="url(#belly)"/>
-      <!-- 날개 안쪽 위 라인을 따라가는 자연스러운 반달 배낭 벨트 -->
-      <path d="M172 262 Q196 286 184 322" stroke="#d8392c" stroke-width="12" fill="none" stroke-linecap="round"/>
-      <path d="M340 262 Q316 286 328 322" stroke="#d8392c" stroke-width="12" fill="none" stroke-linecap="round"/>
+      <!-- 날개 바깥쪽 위 라인을 따르는 반달 벨트(끝 얇고 가운데 볼록) -->
+      <path d="M166 260 Q192 291 168 322 Q166 291 166 260 Z" fill="#d8392c"/>
+      <path d="M346 260 Q320 291 344 322 Q346 291 346 260 Z" fill="#d8392c"/>
       <!-- 눈 -->
       <circle cx="226" cy="300" r="22" fill="#ffffff"/>
       <circle cx="286" cy="300" r="22" fill="#ffffff"/>

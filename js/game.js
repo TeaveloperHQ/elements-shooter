@@ -2275,17 +2275,18 @@
     ctx.moveTo(-4, 2); ctx.lineTo(-1.3, 10.5); ctx.lineTo(-0.3, 3);
     ctx.lineTo(0.3, 3); ctx.lineTo(1.3, 10.5); ctx.lineTo(4, 2);
     ctx.closePath(); ctx.fill();
-    // 몸통(등) + 테두리
-    const bg = ctx.createLinearGradient(-8, -23, 8, 5);
+    // 머리+몸통 한 덩어리(자연스러운 연결) — 가운데가 살짝 잘록한 박 모양
+    const bg = ctx.createLinearGradient(-9, -30, 9, 6);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.ellipse(0, -8, 12.5, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 통통한 몸
-    // 목/어깨 — 머리 아래를 몸통과 매끄럽게 연결(단차 제거)
-    ctx.fillStyle = bg;
     ctx.beginPath();
-    ctx.moveTo(-8, -19); ctx.quadraticCurveTo(-11.5, -15, -11.5, -9);
-    ctx.lineTo(11.5, -9); ctx.quadraticCurveTo(11.5, -15, 8, -19);
-    ctx.closePath(); ctx.fill();
+    ctx.moveTo(0, -29);
+    ctx.bezierCurveTo(8.6, -29, 9, -21, 8, -14.5);     // 머리 우측 → 목
+    ctx.bezierCurveTo(11.6, -13, 13, -2, 11, 3.5);     // 몸통 우측
+    ctx.bezierCurveTo(8, 8.5, -8, 8.5, -11, 3.5);      // 아래 둥글게
+    ctx.bezierCurveTo(-13, -2, -11.6, -13, -8, -14.5); // 몸통 좌측 → 목
+    ctx.bezierCurveTo(-9, -21, -8.6, -29, 0, -29);     // 머리 좌측 → 정수리
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
     // 빨간 배낭(등) — 캔이 늘수록 홀쭉 → 뚱뚱하게 부푼다
@@ -2316,11 +2317,7 @@
     ctx.fillStyle = "#c92f2f"; ctx.beginPath();
     ctx.moveTo(6, -14); ctx.lineTo(11.5 + flap * 4, -9 + flap * 7); ctx.lineTo(8, -12.5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#ff6b6b"; ctx.beginPath(); ctx.arc(0, -15.5, 1.7, 0, Math.PI * 2); ctx.fill();
-    // 뒤통수(둥글게) — 윗부분만 외곽선(아래는 몸통과 자연스럽게 이어짐)
-    ctx.fillStyle = "#1b2733";
-    ctx.beginPath(); ctx.arc(0, -20, 8.4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.arc(0, -20, 8.4, Math.PI * 1.04, Math.PI * 1.96, false); ctx.stroke();   // 위쪽 호만
+    // 둥근 뒤통수 하이라이트(머리 입체감)
     ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22, 3.2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
