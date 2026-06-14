@@ -156,10 +156,10 @@
       x: W / 2, targetX: W / 2, y: 0,
       run: 0,                              // 달리기 위상
       jumpY: 0, vz: 0, onGround: true,
-      jumpV: 540 + META.up.jump * 45,      // 점프(hop) 속도(업그레이드로 강화)
+      jumpV: 540,                          // 점프(hop) 속도(고정)
       flapT: 0,                            // 날갯짓 위상
       energy: 55,                          // 에너지/배고픔 — 점프·비행에 필요(통조림을 까야 충전)
-      lives: 1 + META.up.life,
+      lives: 2,                            // 기본 목숨(고정). 주기율표 완성 시 +1
       stun: 0, tumble: 0,
       falling: false, fallT: 0, fallY: 0, fallVy: 0, fallSpin: 0, holeX: 0, fallFromX: 0, fallDir: 1, fallHole: null,
     };
@@ -188,18 +188,13 @@
       }
     }
   }
-  canvas.addEventListener("mousemove", function (e) { if (state === STATE.PLAY) pointerMove(e.clientX); });
-  canvas.addEventListener("mousedown", function () { holdJump = true; press(); });
+  // 터치 기기에선 화면 버튼(◀▶▲)만으로 조작 — 화면을 잘못 눌러도 점프/이동 안 됨
+  const useButtons = "ontouchstart" in window || navigator.maxTouchPoints > 0 || location.search.indexOf("touch") >= 0;
+  canvas.addEventListener("mousemove", function (e) { if (!useButtons && state === STATE.PLAY) pointerMove(e.clientX); });
+  canvas.addEventListener("mousedown", function () { if (useButtons) return; holdJump = true; press(); });
   window.addEventListener("mouseup", function () { holdJump = false; });
-  canvas.addEventListener("touchmove", function (e) {
-    if (state === STATE.PLAY && e.touches[0]) { pointerMove(e.touches[0].clientX); e.preventDefault(); }
-  }, { passive: false });
-  canvas.addEventListener("touchstart", function (e) {
-    if (state === STATE.PLAY && e.touches[0]) pointerMove(e.touches[0].clientX);
-    holdJump = true; press();
-  });
-  canvas.addEventListener("touchend", function () { holdJump = false; });
-  canvas.addEventListener("touchcancel", function () { holdJump = false; });
+  canvas.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });   // 스크롤만 막고 무시
+  canvas.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });    // 캔버스 탭은 무시(버튼만)
   window.addEventListener("keydown", function (e) {
     if (e.key === "ArrowLeft") keyLeft = true;
     if (e.key === "ArrowRight") keyRight = true;
@@ -267,14 +262,13 @@
     const finalScore = Math.floor(score);
     document.getElementById("final-score").textContent = finalScore;
 
-    META.coins += runCoins;
     for (const sym in learned) META.dex[sym] = true;
     const rec = finalScore > META.high;
     if (rec) META.high = finalScore;
     META.save();
 
     document.getElementById("run-coins").innerHTML =
-      "🏁 거리 <b>" + dist + "m</b>　🪙 코인 <b>+" + runCoins + "</b>" + (rec ? "　🏆 <b>신기록!</b>" : "");
+      "🏁 거리 <b>" + dist + "m</b>" + (rec ? "　🏆 <b>신기록!</b>" : "");
     const names = Object.keys(learned);
     document.getElementById("elements-learned").innerHTML =
       names.length ? "오늘 만난 원소: <b>" + names.join(", ") + "</b>" : "이번엔 원소를 만나지 못했어요!";
