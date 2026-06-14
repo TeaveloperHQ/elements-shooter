@@ -2293,8 +2293,11 @@
       const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
       const pf = Math.min(1, pn / 26);                 // 더 천천히 빵빵해짐
       const cyp = -4, rx = 3.4 + 6.6 * pf, ry = 7 + 3.2 * pf, topY = cyp - ry;
-      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.5; ctx.lineCap = "round";    // 어깨끈(더 벌어지게)
-      ctx.beginPath(); ctx.moveTo(-rx * 0.6, topY + 1); ctx.lineTo(-8, -16.5); ctx.moveTo(rx * 0.6, topY + 1); ctx.lineTo(8, -16.5); ctx.stroke();
+      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.6; ctx.lineCap = "round";    // 어깨끈(목을 두르듯 넓게)
+      ctx.beginPath();
+      ctx.moveTo(-rx * 0.55, topY + 1); ctx.quadraticCurveTo(-11.5, -11, -9.5, -20);
+      ctx.moveTo(rx * 0.55, topY + 1); ctx.quadraticCurveTo(11.5, -11, 9.5, -20);
+      ctx.stroke();
       ctx.fillStyle = "#d8392c"; ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1;  // 둥근 주머니(아래가 볼록)
       ctx.beginPath(); ctx.ellipse(0, cyp, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "rgba(120,24,16,0.3)"; ctx.beginPath(); ctx.ellipse(rx * 0.36, cyp + ry * 0.08, rx * 0.5, ry * 0.85, 0, 0, Math.PI * 2); ctx.fill();  // 측면 음영
@@ -2310,8 +2313,6 @@
       ctx.fillStyle = "rgba(180,235,255,0.5)";
       ctx.beginPath(); ctx.arc(0, 8, 5, 0, Math.PI * 2); ctx.fill();
     }
-    // 둥근 뒤통수 하이라이트(머리 입체감)
-    ctx.fillStyle = "rgba(150,185,215,0.25)"; ctx.beginPath(); ctx.arc(-2.8, -22, 3.2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
