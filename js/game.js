@@ -927,8 +927,8 @@
         ctx.save(); ctx.translate(x, y - 8 * sc); ctx.rotate(s.spin); ctx.scale(sc, sc);
         ctx.fillStyle = "#cfd8e0"; ctx.strokeStyle = "#8a98a4"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.rect(-7, -9, 14, 18); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#e7eef5"; ctx.fillRect(-7, -3, 14, 6);
-        ctx.fillStyle = s.color || "#69c"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = "#2f8fe0"; ctx.fillRect(-7, -3, 14, 6);   // 파란 라벨 통일
+        ctx.fillStyle = "#fff"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(s.sym || "", 0, 2); ctx.textAlign = "start";
         ctx.restore();
       } else if (s.kind === "water") {            // 바다표범 물대포
@@ -2161,41 +2161,37 @@
     oSparkle(x - 9 * sc, cy + 3 * sc, 1.1 * sc, "rgba(255,255,255,0.7)");
   }
 
-  // 상단 통조림 보관함
-  // 상단 미니 주기율표 — 보유 통조림을 주기(행)·족(열) 자리에 분류색으로 채움
+  // 상단 보유 통조림 — 자연스러운 캔 줄(원소 번호순), 중복은 밑에 ×개수
   function drawStored() {
-    const cell = 13, rowH = 14, cols = 18, rows = 4, tableW = cols * cell;
-    const sx = W / 2 - tableW / 2, y0 = 78;
-    const cnt = {};
-    for (const c of stored) cnt[c.symbol] = (cnt[c.symbol] || 0) + 1;
-    ctx.fillStyle = "rgba(8,22,38,0.32)"; ctx.fillRect(sx - 4, y0 - 4, tableW + 8, rows * rowH + 6);
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    for (const el of ELEMENTS) {
-      const cx = sx + (el.group - 0.5) * cell;
-      const cy = y0 + (el.period - 0.5) * rowH;
-      const has = cnt[el.symbol] > 0;
-      if (has) {
-        ctx.fillStyle = el.color; ctx.fillRect(cx - cell / 2 + 0.5, cy - rowH / 2 + 1, cell - 1, rowH - 2);
-        ctx.fillStyle = "rgba(18,26,36,0.95)"; ctx.font = "bold 7px sans-serif"; ctx.fillText(el.symbol, cx, cy + 0.5);
-        if (cnt[el.symbol] > 1) { ctx.fillStyle = "rgba(10,18,28,0.9)"; ctx.font = "bold 5px sans-serif"; ctx.fillText(cnt[el.symbol], cx + cell * 0.32, cy - rowH * 0.28); }
-      } else {
-        ctx.fillStyle = "rgba(150,185,215,0.13)"; ctx.fillRect(cx - cell / 2 + 0.5, cy - rowH / 2 + 1, cell - 1, rowH - 2);
-      }
+    if (!stored.length) return;
+    const map = {}, order = [];
+    for (const c of stored) { if (map[c.symbol] == null) { map[c.symbol] = { symbol: c.symbol, number: c.number || 0, n: 0 }; order.push(c.symbol); } map[c.symbol].n++; }
+    const list = order.map(function (k) { return map[k]; }).sort(function (a, b) { return a.number - b.number; });
+    const cw = 18, step = 23, perRow = Math.max(1, Math.floor((W - 16) / step));
+    const rows = Math.ceil(list.length / perRow), rowH = 30, y0 = 80;
+    for (let i = 0; i < list.length; i++) {
+      const r = Math.floor(i / perRow), ci = i % perRow;
+      const inRow = (r < rows - 1) ? perRow : (list.length - r * perRow);
+      const rowW = inRow * step - (step - cw);
+      const sx = W / 2 - rowW / 2;
+      drawTopCan(sx + ci * step + cw / 2, y0 + r * rowH, list[i].symbol, list[i].n);
     }
-    // 보유 통조림 총 개수(보스전 탄약)
-    ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 11px sans-serif";
-    ctx.fillText("🥫" + stored.length, sx + tableW + 16, y0 + rows * rowH / 2);
-    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
   }
-  function drawMiniCan(cx, cy, c) {
-    const w = 20, h = 16;
+  // 작은 파란 통조림(상단/보관) — 라벨 파랑 통일
+  function drawTopCan(cx, cyc, symbol, n) {
+    const w = 18, h = 14, top = cyc - h / 2;
     const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
-    g.addColorStop(0, "#8fa3b5"); g.addColorStop(0.5, "#f0f6fb"); g.addColorStop(1, "#8fa3b5");
-    ctx.fillStyle = g; ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-    ctx.fillStyle = "#e3edf5"; ctx.beginPath(); ctx.ellipse(cx, cy - h / 2, w / 2, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(cx - w / 2, cy - 4, w, 9);
-    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 9px sans-serif"; ctx.fillText(c.symbol, cx, cy + 3.5);
-    ctx.textAlign = "start";
+    g.addColorStop(0, "#7f93a6"); g.addColorStop(0.45, "#f3f8fc"); g.addColorStop(0.6, "#e4edf5"); g.addColorStop(1, "#7d91a3");
+    ctx.fillStyle = g; ctx.fillRect(cx - w / 2, top, w, h);
+    ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fillRect(cx - w * 0.32, top, w * 0.09, h);          // 세로 광택
+    ctx.fillStyle = "#2f8fe0"; ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.5);                 // 파란 라벨 밴드
+    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(cx - w / 2, top + h * 0.28, w, h * 0.07);
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 7px sans-serif";
+    ctx.fillText(symbol, cx, top + h * 0.55);
+    ctx.fillStyle = "#eef4fa"; ctx.strokeStyle = "rgba(90,120,150,0.5)"; ctx.lineWidth = 1;          // 뚜껑
+    ctx.beginPath(); ctx.ellipse(cx, top, w / 2, 2.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (n > 1) { ctx.fillStyle = "#cfe6ff"; ctx.font = "bold 9px sans-serif"; ctx.fillText("×" + n, cx, cyc + h * 0.5 + 7); }
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "start";
   }
 
   // ---------- 펭귄(뒤에서 본 달리기) ----------
@@ -2279,6 +2275,23 @@
     ctx.closePath(); ctx.fill();
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
+    // 빨간 배낭(등) — 모은 캔이 늘수록 아래에서 위로 채워짐
+    {
+      const pn = (typeof stored !== "undefined" && stored) ? stored.length : 0;
+      const pf = Math.min(1, pn / 12);
+      const px = -7, py = -12, pw = 14, ph = 15, pr = 3.2;
+      const packPath = function () { ctx.beginPath(); ctx.moveTo(px + pr, py); ctx.arcTo(px + pw, py, px + pw, py + ph, pr); ctx.arcTo(px + pw, py + ph, px, py + ph, pr); ctx.arcTo(px, py + ph, px, py, pr); ctx.arcTo(px, py, px + pw, py, pr); ctx.closePath(); };
+      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1.5; ctx.lineCap = "round";   // 어깨끈
+      ctx.beginPath(); ctx.moveTo(px + 3, py); ctx.lineTo(px + 2, -3); ctx.moveTo(px + pw - 3, py); ctx.lineTo(px + pw - 2, -3); ctx.stroke();
+      ctx.fillStyle = "#7c2018"; packPath(); ctx.fill();                         // 빈 배낭(어두운 빨강)
+      ctx.save(); packPath(); ctx.clip();                                        // 채움(아래→위)
+      ctx.fillStyle = "#e23b3b"; ctx.fillRect(px, py + ph - ph * pf, pw, ph * pf);
+      ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(px, py + ph - ph * pf, pw, 1.3);
+      ctx.restore();
+      ctx.strokeStyle = "#a82e22"; ctx.lineWidth = 1; packPath(); ctx.stroke();  // 테두리
+      ctx.fillStyle = "#c0392b"; ctx.fillRect(px - 0.5, py - 0.5, pw + 1, 4.6);  // 플랩
+      ctx.fillStyle = "#d8dde2"; ctx.fillRect(-1.6, py + 4, 3.2, 2);             // 은색 버클
+    }
     // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(뿌리가 몸통에 묻힘)
     ctx.fillStyle = "#0e1a24";
     ctx.save(); ctx.translate(-9.5, -12); ctx.rotate(0.2 + flap); ctx.beginPath(); ctx.ellipse(0, wingLen * 0.55, 3.3, wingLen * 0.92, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -2390,6 +2403,12 @@
     startBoss();
     const pm = location.search.match(/pose=([\d.]+)/);   // 포즈 고정(공격 모션 확인용)
     if (pm) { boss.intro = 0; boss.lane = 0; boss.throwT = +pm[1]; galleryMode = true; }
+  }
+  // ?cans: 상단 캔 줄·배낭 채움 확인용(보유 통조림 채움)
+  if (location.search.indexOf("cans") >= 0) {
+    startGame(); state = STATE.PLAY;
+    const picks = [0, 0, 0, 2, 5, 5, 8, 11, 14, 20, 24];
+    for (const i of picks) { const e = ELEMENTS[i]; stored.push({ symbol: e.symbol, name: e.name, color: e.color, number: e.number }); }
   }
   // ?relay: 보스 격파 귀환 화면 미리보기(=seal 이면 남극 정복)
   if (location.search.indexOf("relay") >= 0) {
