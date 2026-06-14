@@ -31,6 +31,57 @@ canvas#game {
   height: 100%;
 }
 
+/* ---------- 모바일 조작 버튼 ---------- */
+#touch-controls {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 130px;
+  z-index: 6;
+  padding: 0 18px 20px;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+body.touch #touch-controls {
+  display: flex;
+}
+.tc-move {
+  display: flex;
+  gap: 16px;
+  margin-left: 44px;
+  pointer-events: none;
+}
+.tc-btn {
+  pointer-events: auto;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(180, 220, 255, 0.55);
+  background: rgba(18, 46, 76, 0.42);
+  color: #eaf6ff;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  backdrop-filter: blur(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.tc-btn:active {
+  background: rgba(60, 140, 210, 0.62);
+  transform: scale(0.93);
+}
+.tc-jump {
+  width: 84px;
+  height: 84px;
+  font-size: 30px;
+  background: rgba(40, 120, 200, 0.46);
+}
+
 /* ---------- HUD ---------- */
 #hud {
   position: absolute;

@@ -103,7 +103,7 @@
     { key: "liberty",   name: "미국",      icon: "🗽", tint: "rgba(120,160,210,0.10)" },
     { key: "clock",     name: "영국",      icon: "🎡", tint: "rgba(150,160,175,0.16)" },
     { key: "eiffel",    name: "프랑스",    icon: "🗼", tint: "rgba(210,150,200,0.14)" },
-    { key: "korea",     name: "한국",      icon: "🏯", tint: "rgba(120,180,160,0.12)" },
+    { key: "korea",     name: "한국",      icon: "🇰🇷", tint: "rgba(120,180,160,0.12)" },
     { key: "windmill",  name: "네덜란드",  icon: "🌷", tint: "rgba(120,200,170,0.12)" },
     { key: "pisa",      name: "이탈리아",  icon: "🍕", tint: "rgba(255,180,120,0.16)" },
     { key: "pyramid",   name: "이집트",    icon: "🐫", tint: "rgba(255,170,80,0.22)" },
@@ -210,6 +210,25 @@
     if (e.key === "ArrowRight") keyRight = false;
     if (e.key === " " || e.key === "ArrowUp" || e.key === "Spacebar") holdJump = false;
   });
+
+  // 모바일 화면 버튼(터치 기기에서만 표시)
+  if ("ontouchstart" in window || navigator.maxTouchPoints > 0 || location.search.indexOf("touch") >= 0) {
+    document.body.classList.add("touch");
+  }
+  function bindHold(id, on, off) {
+    const el = document.getElementById(id); if (!el) return;
+    const down = function (e) { e.preventDefault(); on(); };
+    const up = function (e) { if (e) e.preventDefault(); off(); };
+    el.addEventListener("touchstart", down, { passive: false });
+    el.addEventListener("touchend", up, { passive: false });
+    el.addEventListener("touchcancel", up, { passive: false });
+    el.addEventListener("mousedown", down);
+    window.addEventListener("mouseup", up);
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  bindHold("btn-left", function () { keyLeft = true; }, function () { keyLeft = false; });
+  bindHold("btn-right", function () { keyRight = true; }, function () { keyRight = false; });
+  bindHold("btn-jump", function () { holdJump = true; press(); }, function () { holdJump = false; });
 
   // ===================== 화면 전환 =====================
   const startScreen = document.getElementById("start-screen");
@@ -1541,6 +1560,7 @@
         ctx.fillStyle = "rgba(40,80,120,0.16)";
         ctx.beginPath(); ctx.ellipse(x, y, 22 * base, 5 * base, 0, 0, Math.PI * 2); ctx.fill();
         if (d.key === "pisa") drawPizzeria(x, y, base);     // 이탈리아: 피자 대신 피자리아 가게
+        else if (d.key === "korea") drawHanok(x, y, base);  // 한국: 일본성 이모지 대신 한옥
         else drawLandmarkIcon(d.icon || stageLandmark().icon, d.name || "", x, y, base);
         continue;
       }
@@ -1604,6 +1624,36 @@
     ctx.strokeStyle = "#c98a2e"; ctx.lineWidth = Math.max(0.8, s); ctx.stroke();
     ctx.fillStyle = "#d23b34"; for (const d of [[-2, -1], [2, 0], [-1, 2.5], [2.4, 2.4], [0, -2.8]]) { ctx.beginPath(); ctx.arc(pcx + d[0] * s, pcy + d[1] * s, 1.1 * s, 0, Math.PI * 2); ctx.fill(); }
     ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+  }
+
+  // ---------- 한국 길가: 한옥(석축·단청·곡선 기와지붕) ----------
+  function drawHanok(x, y, s) {
+    const w = 36 * s, bx = x - w / 2;
+    // 석축(돌 기단)
+    ctx.fillStyle = "#cdc7bb"; ctx.strokeStyle = "rgba(110,104,92,0.5)"; ctx.lineWidth = Math.max(1, s);
+    ctx.fillRect(bx, y - 9 * s, w, 9 * s); ctx.strokeRect(bx, y - 9 * s, w, 9 * s);
+    // 단청 몸체(녹청 + 붉은 띠 + 붉은 기둥)
+    const pw = w * 0.84, pbx = x - pw / 2, pty = y - 9 * s - 12 * s, ph = 12 * s;
+    ctx.fillStyle = "#3f8f80"; ctx.fillRect(pbx, pty, pw, ph);
+    ctx.fillStyle = "#a8473f"; ctx.fillRect(pbx, pty, pw, ph * 0.32);
+    ctx.fillStyle = "rgba(235,228,210,0.85)"; ctx.fillRect(pbx, pty + ph * 0.32, pw, 1 * s);
+    ctx.fillStyle = "#8c4038"; for (let i = 0; i <= 5; i++) { const px = pbx + pw * i / 5; ctx.fillRect(px - 1.4 * s, pty + ph * 0.34, 2.8 * s, ph * 0.66); }
+    // 곡선 기와지붕(넓고 낮음, 처마 끝 살짝 들림) + 용마루
+    const ry = pty, rw = w * 1.18, rh = 12 * s;
+    ctx.fillStyle = "#46566e";
+    ctx.beginPath();
+    ctx.moveTo(x - rw / 2, ry - rh * 0.04);
+    ctx.lineTo(x - rw * 0.2, ry - rh);
+    ctx.lineTo(x + rw * 0.2, ry - rh);
+    ctx.lineTo(x + rw / 2, ry - rh * 0.04);
+    ctx.quadraticCurveTo(x + rw * 0.4, ry + rh * 0.16, x + rw * 0.47, ry);
+    ctx.lineTo(x - rw * 0.47, ry);
+    ctx.quadraticCurveTo(x - rw * 0.4, ry + rh * 0.16, x - rw / 2, ry - rh * 0.04);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#33415a"; ctx.fillRect(x - rw * 0.2, ry - rh - 1.5 * s, rw * 0.4, 3 * s);   // 용마루
+    ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.moveTo(x, ry - rh); ctx.lineTo(x + rw / 2, ry - rh * 0.04); ctx.lineTo(x, ry); ctx.closePath(); ctx.fill();   // 우측 음영
+    // 가운데 문(검정)
+    ctx.fillStyle = "rgba(40,46,54,0.7)"; ctx.fillRect(x - 4 * s, y - 9 * s, 8 * s, 9 * s);
   }
 
   // ---------- 전세계 명물 얼음조각(미사용: 아이콘 방식으로 대체) ----------

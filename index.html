@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="원소 슈터" />
 
-  <link rel="stylesheet" href="css/style.css?v=38" />
+  <link rel="stylesheet" href="css/style.css?v=39" />
 </head>
 <body>
   <div id="game-wrap">
@@ -32,6 +32,15 @@
 
     <!-- 원소 설명 토스트 -->
     <div id="toast"></div>
+
+    <!-- 모바일 조작 버튼 -->
+    <div id="touch-controls">
+      <div class="tc-move">
+        <button class="tc-btn" id="btn-left" aria-label="왼쪽">◀</button>
+        <button class="tc-btn" id="btn-right" aria-label="오른쪽">▶</button>
+      </div>
+      <button class="tc-btn tc-jump" id="btn-jump" aria-label="점프·날기·던지기">▲</button>
+    </div>
 
     <!-- 시작 화면 -->
     <div id="start-screen" class="overlay">
@@ -76,7 +85,7 @@
     </div>
   </div>
 
-  <script src="js/elements.js?v=38"></script>
-  <script src="js/game.js?v=38"></script>
+  <script src="js/elements.js?v=39"></script>
+  <script src="js/game.js?v=39"></script>
 </body>
 </html>
