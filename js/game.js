@@ -2287,7 +2287,7 @@
     const bg = ctx.createLinearGradient(-9, -21, 9, 7);
     bg.addColorStop(0, "#33455a"); bg.addColorStop(0.5, "#22303f"); bg.addColorStop(1, "#101a24");
     ctx.fillStyle = bg; ctx.strokeStyle = "rgba(10,16,24,0.5)"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.ellipse(0, -6, 13, 13.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -7, 12.3, 15, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();   // 살짝 세로 타원
     // 등 림라이트(부드러운 광택)
     ctx.fillStyle = "rgba(160,195,225,0.3)"; ctx.beginPath(); ctx.ellipse(-3.5, -12, 4, 7.5, -0.25, 0, Math.PI * 2); ctx.fill();
     // 날개 — 어깨에서 뻗어 몸통에 붙은 플리퍼(배낭보다 뒤 레이어)
