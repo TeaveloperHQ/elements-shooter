@@ -1,6 +1,6 @@
 /*
  * elements.js
- * 원소 1~25번(H~Mn). 통조림(수집 아이템)으로 등장.
+ * 원소 1~30번(H~Zn). 통조림(수집 아이템)으로 등장.
  * period(주기)·group(족)으로 상단 미니 주기율표에 배치되고,
  * cat(분류)에 따라 표준 주기율표 색을 라벨에 쓴다.
  */
@@ -17,9 +17,9 @@ const ELEM_CAT_COLOR = {
   transition: "#ffb0c4",  // 전이 금속
 };
 
-function E(number, symbol, name, period, group, cat) {
+function E(number, symbol, name, period, group, cat, rare) {
   return { number: number, symbol: symbol, name: name, period: period, group: group,
-    cat: cat, color: ELEM_CAT_COLOR[cat], kind: "buff" };
+    cat: cat, color: ELEM_CAT_COLOR[cat], kind: "buff", rare: !!rare };
 }
 
 const ELEMENTS = [
@@ -33,7 +33,7 @@ const ELEMENTS = [
   E(8,  "O",  "산소",     2, 16, "nonmetal"),
   E(9,  "F",  "플루오린", 2, 17, "halogen"),
   E(10, "Ne", "네온",     2, 18, "noble"),
-  E(11, "Na", "나트륨",   3, 1,  "alkali"),
+  E(11, "Na", "소듐",     3, 1,  "alkali"),
   E(12, "Mg", "마그네슘", 3, 2,  "alkaline"),
   E(13, "Al", "알루미늄", 3, 13, "posttrans"),
   E(14, "Si", "규소",     3, 14, "metalloid"),
@@ -41,23 +41,37 @@ const ELEMENTS = [
   E(16, "S",  "황",       3, 16, "nonmetal"),
   E(17, "Cl", "염소",     3, 17, "halogen"),
   E(18, "Ar", "아르곤",   3, 18, "noble"),
-  E(19, "K",  "칼륨",     4, 1,  "alkali"),
+  E(19, "K",  "포타슘",   4, 1,  "alkali"),
   E(20, "Ca", "칼슘",     4, 2,  "alkaline"),
   E(21, "Sc", "스칸듐",   4, 3,  "transition"),
   E(22, "Ti", "타이타늄", 4, 4,  "transition"),
   E(23, "V",  "바나듐",   4, 5,  "transition"),
   E(24, "Cr", "크로뮴",   4, 6,  "transition"),
   E(25, "Mn", "망가니즈", 4, 7,  "transition"),
+  E(26, "Fe", "철",       4, 8,  "transition"),
+  E(27, "Co", "코발트",   4, 9,  "transition"),
+  E(28, "Ni", "니켈",     4, 10, "transition"),
+  E(29, "Cu", "구리",     4, 11, "transition"),
+  E(30, "Zn", "아연",     4, 12, "transition"),
+  // 희귀(귀금속·중금속) — 5·6주기. 낮은 확률·고득점, 상단 별도 줄
+  E(47, "Ag", "은",       5, 11, "transition", true),
+  E(53, "I",  "아이오딘", 5, 17, "halogen",    true),
+  E(78, "Pt", "백금",     6, 10, "transition", true),
+  E(79, "Au", "금",       6, 11, "transition", true),
+  E(80, "Hg", "수은",     6, 12, "transition", true),
+  E(82, "Pb", "납",       6, 14, "posttrans",  true),
 ];
 
 // 족(group)별 라벨 색 — 표준 주기율표 분류색 계열
 const GROUP_COLOR = {
   1: "#ff6b6b", 2: "#ffb066",                                  // 알칼리 / 알칼리토
-  3: "#ffb0c4", 4: "#ffb0c4", 5: "#ffb0c4", 6: "#ffb0c4", 7: "#ffb0c4",  // 전이금속
+  3: "#ffb0c4", 4: "#ffb0c4", 5: "#ffb0c4", 6: "#ffb0c4", 7: "#ffb0c4",   // 전이금속
+  8: "#ffb0c4", 9: "#ffb0c4", 10: "#ffb0c4", 11: "#ffb0c4", 12: "#ffb0c4",  // 전이금속(8~12)
   13: "#caa978", 14: "#cccc7a", 15: "#86e08a", 16: "#ffe24e", 17: "#ffc24e", 18: "#7fd6e8",
 };
 function groupColor(g) { return GROUP_COLOR[g] || "#9fb6c8"; }
 
-// 통조림은 모든 원소에서 등장
-const BUFF_ELEMENTS = ELEMENTS;
+// 일반 캔(1~30)과 희귀 캔(귀금속·중금속) 분리
+const BUFF_ELEMENTS = ELEMENTS.filter(function (e) { return !e.rare; });
+const RARE_ELEMENTS = ELEMENTS.filter(function (e) { return e.rare; });
 const TRAP_ELEMENTS = [];

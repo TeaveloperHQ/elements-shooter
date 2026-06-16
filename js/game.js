@@ -324,8 +324,9 @@
       items.push({ type: "hole", lane: lane, p: 0, vp: 0.10, done: false, cleared: false,
         w: (1 / 3) + Math.random() * (1 / 3), len: 0.03, shape: makeJagged() });
     } else if (r < 0.86) {
-      // 정어리 통조림 (겉면에 원소 기호)
-      const el = BUFF_ELEMENTS[(Math.random() * BUFF_ELEMENTS.length) | 0];
+      // 정어리 통조림 — 가끔(9%) 희귀 원소(귀금속·중금속)
+      const pool = (Math.random() < 0.09 && RARE_ELEMENTS.length) ? RARE_ELEMENTS : BUFF_ELEMENTS;
+      const el = pool[(Math.random() * pool.length) | 0];
       items.push({ type: "can", el: el, lane: -0.75 + Math.random() * 1.5,
         p: 0, vp: 0.10, done: false, wave: Math.random() * 6.28 });
     } else {
@@ -594,14 +595,16 @@
     const catchR = 36 + META.up.magnet * 8;
     if (player.jumpY > AIR || Math.abs(player.x - ox) >= catchR) return false;
     learned[el.symbol] = true;
-    stored.push({ symbol: el.symbol, name: el.name, color: el.color, period: el.period, group: el.group, number: el.number });
-    score += 30; runCoins += 1;
-    spawnParticles(player.x, playerLineY() - 20, el.color, 10, 150);
-    spawnText(player.x, playerLineY() - 58, el.name + "!", el.color, 24);   // 한글 원소 이름 외치기
+    stored.push({ symbol: el.symbol, name: el.name, color: el.color, period: el.period, group: el.group, number: el.number, rare: el.rare });
+    score += el.rare ? 150 : 30; runCoins += el.rare ? 3 : 1;
+    spawnParticles(player.x, playerLineY() - 20, el.color, el.rare ? 16 : 10, el.rare ? 200 : 150);
+    spawnText(player.x, playerLineY() - 58, (el.rare ? "✨" : "") + el.name + "!", el.color, el.rare ? 26 : 24);   // 한글 원소 이름 외치기
     SND.flag();
-    showToast(el.symbol + " = " + el.name + " 통조림 획득! (위에 모임)", false);
-    // 주기율표(1~25) 완성 → 목숨 +1, 그리고 모은 원소·통조림 전부 리셋(배낭도 홀쭉) → 다시 채우면 또 획득
-    if (Object.keys(learned).length >= ELEMENTS.length) {
+    showToast(el.symbol + " = " + el.name + (el.rare ? " 희귀 통조림! ✨" : " 통조림 획득! (위에 모임)"), false);
+    // 주기율표(1~30) 완성 → 목숨 +1, 모은 원소·통조림 전부 리셋(배낭 홀쭉) → 다시 채우면 또 획득 (희귀는 보너스, 기준 제외)
+    const rareSym = {}; for (const e of RARE_ELEMENTS) rareSym[e.symbol] = 1;
+    let commonLearned = 0; for (const s in learned) if (!rareSym[s]) commonLearned++;
+    if (commonLearned >= BUFF_ELEMENTS.length) {
       player.lives++;
       for (const s in learned) META.dex[s] = true;   // 영구 도감엔 보존
       learned = {}; stored = [];                       // 주기율표·배낭 리셋
@@ -2178,12 +2181,21 @@
     if (!stored.length) return;
     const cnt = {};
     for (const c of stored) cnt[c.symbol] = (cnt[c.symbol] || 0) + 1;
-    const cell = 24, rowH = 21, y0 = 74, sx = W / 2 - (18 * cell) / 2;
+    const cell = 24, rowH = 19, y0 = 70, sx = W / 2 - (18 * cell) / 2;
+    // 메인 격자(1~30, 주기 1~4)
     for (const el of ELEMENTS) {
-      if (!cnt[el.symbol]) continue;                 // 보유한 것만
+      if (el.rare || !cnt[el.symbol]) continue;      // 보유한 일반 원소만
       const cx = sx + (el.group - 0.5) * cell;
       const cy = y0 + (el.period - 0.5) * rowH;
       drawTopCan(cx, cy, el.symbol, cnt[el.symbol], el.group);
+    }
+    // 희귀 줄(번호순, 가운데) — 보유한 것만
+    const rares = ELEMENTS.filter(function (e) { return e.rare && cnt[e.symbol]; });
+    if (rares.length) {
+      const rstep = 24, rw = rares.length * rstep - (rstep - 18), rsx = W / 2 - rw / 2, ry = y0 + 4 * rowH + 12;
+      ctx.strokeStyle = "rgba(180,210,235,0.25)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(W / 2 - 64, ry - 12); ctx.lineTo(W / 2 + 64, ry - 12); ctx.stroke();
+      for (let i = 0; i < rares.length; i++) drawTopCan(rsx + i * rstep + 9, ry, rares[i].symbol, cnt[rares[i].symbol], rares[i].group);
     }
   }
   // 작은 통조림(상단/보관) — 라벨색은 족(group)별
@@ -2409,7 +2421,7 @@
   // ?cans: 상단 캔 줄·배낭 채움 확인용(보유 통조림 채움)
   if (location.search.indexOf("cans") >= 0) {
     startGame(); state = STATE.PLAY;
-    const picks = [0, 0, 0, 2, 5, 5, 8, 11, 14, 20, 24];
+    const picks = [0, 0, 0, 2, 5, 5, 8, 11, 14, 20, 24, 30, 31, 33, 35];
     for (const i of picks) { const e = ELEMENTS[i]; stored.push({ symbol: e.symbol, name: e.name, color: e.color, number: e.number }); }
   }
   // ?relay: 보스 격파 귀환 화면 미리보기(=seal 이면 남극 정복)

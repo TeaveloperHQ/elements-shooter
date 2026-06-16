@@ -139,7 +139,7 @@ body.touch #touch-controls {
 #toast {
   position: absolute;
   left: 50%;
-  top: 162px;
+  top: 180px;
   transform: translateX(-50%) translateY(-20px);
   background: rgba(10, 16, 28, 0.92);
   border: 1px solid rgba(120, 200, 160, 0.4);
